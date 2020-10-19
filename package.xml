@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>fy03_localization</name>
+  <version>0.0.0</version>
+  <description>A ROS package containing an outdoor localization system that fuses UWB and IMU sensor data.</description>
+
+  <maintainer email="joeyyang.ai@gmail.com">Joey Yang</maintainer>
+  <author email="joeyyang.ai@gmail.com">Joey Yang</author>
+
+  <license>BSD</license>
+  
+  <url type="repository">https://github.com/joeyjyyang/fy03_localization</url>
+  
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>message_generation</build_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+ 
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+</package>
