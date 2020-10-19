@@ -20,8 +20,8 @@ catkin_package(
   CATKIN_DEPENDS rospy std_msgs message_runtime sensor_msgs
 )
 
-#install(
-#   PROGRAMS scripts/fy03_localization_node.py
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-#)
+catkin_install_python(
+   PROGRAMS scripts/fy03_localization_node.py
+   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 

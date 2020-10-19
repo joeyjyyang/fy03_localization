@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<launch>
+  <node name="fy03_localization" pkg="fy03_localization" type="fy03_localization_node.py" output="screen"/>
+</launch>
