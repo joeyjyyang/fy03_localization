@@ -4,18 +4,18 @@ import rospy, time, serial, os
 
 serialReadLine = ""
 
+# initialize serial port connections
+serialPortDWM1001 = serial.Serial(
+    port       = "/dev/ttyACM0",
+    baudrate   = 115200,
+    #parity = serial.PARITY_ODD
+    #stopbits = serial.STOPBITS_TWO
+    #bytesize = serial.SEVENBITS
+)
+
 def run():
     # allow serial port to be detected by user
     os.popen("sudo chmod 777 /dev/ttyACM0", "w")
-
-    # initialize serial port connections
-    serialPortDWM1001 = serial.Serial(
-        port       = "/dev/ttyACM0",
-	baudrate   = 115200,
-	parity = serial.PARITY_ODD
-	stopbits = serial.STOPBITS_TWO
-	bytesize = serial.SEVENBITS
-    )
 
     # close the serial port in case the previous run didn't closed it properly
     serialPortDWM1001.close()
@@ -27,10 +27,10 @@ def run():
     # check if the serial port is opened
     if(serialPortDWM1001.isOpen()):
         rospy.loginfo("Port opened: "+ str(serialPortDWM1001.name) )
-        ''' 
+         
         # start sending commands to the board so we can initialize the board
         # reset incase previuos run didn't close properly
-        serialPortDWM1001.write(DWM1001_API_COMMANDS.RESET)
+        serialPortDWM1001.write(b'reset')
         # send ENTER two times in order to access api
         serialPortDWM1001.write(b'\r')
         # sleep for half a second
@@ -42,22 +42,46 @@ def run():
         serialPortDWM1001.write(b'\r')
 
         # give some time to DWM1001 to wake up
-         time.sleep(2)
+        time.sleep(2)
         # send command lec, so we can get positions is CSV format
-        serialPortDWM1001.write(DWM1001_API_COMMANDS.LEC)
-        serialPortDWM1001.write(DWM1001_API_COMMANDS.SINGLE_ENTER)'''
+        serialPortDWM1001.write(b'lec')
+        serialPortDWM1001.write(b'\r')
         rospy.loginfo("Reading DWM1001 coordinates")
         rospy.loginfo("test")
     
     else:
         rospy.loginfo("Can't open port: "+ str(serialPortDWM1001.name))
+ 
+def publish():
+    # just read everything from serial port
+    serialReadLine = serialPortDWM1001.read_until()
     
-    rospy.spin()
+    rospy.loginfo(serialReadLine)
+    #self.pubblishCoordinatesIntoTopics(self.splitByComma(serialReadLine))
+    
+def end(rate):
+    rospy.loginfo("Quitting, and sending reset command to dev board")
+    serialPortDWM1001.write(b'reset')
+    serialPortDWM1001.write(b'\r')
+    rate.sleep()
+    
+    if "reset" in serialReadLine:
+        rospy.loginfo("succesfully closed ")
+        serialPortDWM1001.close()
 
 if __name__ == '__main__':
+    
     rospy.init_node("fy03_localization_node")
+    rate = rospy.Rate(15)
+    run()
     
     try:
- 	run() 
+        while not rospy.is_shutdown():
+            publish()
+            rate.sleep()
+   
     except rospy.ROSInterruptException:
-        pass
+        rospy.loginfo("end")
+        end(rate)
+
+
