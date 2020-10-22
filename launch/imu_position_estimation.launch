@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<launch>
+  <node name="imu_position_estimation_node" pkg="fy03_localization" type="imu_position_estimation_node.py" respawn="false" output="screen"/>
+</launch>
