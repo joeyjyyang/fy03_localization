@@ -11,14 +11,30 @@ import rospy
 from sensor_msgs.msg import Imu
 
 position = [0, 0, 0]
-previous_time = 0;
+previous_time = 0
+total_time = 0
+accuracy_5cm = True
+accuracy_10cm = True
+
+def accuracyTest5Cm():
+  global position, total_time, accuracy_5cm
+  if (accuracy_5cm and (abs(position[0]) >= 0.05 or abs(position[1]) >= 0.05 or abs(position[2]) >= 0.05)):
+    accuracy_5cm = False
+    rospy.logwarn("Failed 5cm accuracy at in %f seconds. POOP", total_time)
+
+def accuracyTest10Cm():
+  global position, total_time, accuracy_10cm
+  if (accuracy_10cm and (abs(position[0]) >= 0.10 or abs(position[1]) >= 0.10 or abs(position[2]) >= 0.10)):
+    accuracy_10cm = False
+    rospy.logwarn("Failed 10cm accuracy at in %f seconds.", total_time)
 
 def imuCallback(imu_msg):
-  global position, previous_time
+  global position, previous_time, total_time, accuracy_5cm, accuracy_10cm
   
   message_time = imu_msg.header.stamp.to_sec()
   # rospy.loginfo("Message sequence: %f, Message time: %f", imu_msg.header.seq, message_time)
-  time_difference = message_time - previous_time 
+  time_difference = message_time - previous_time
+  total_time += time_difference 
   # rospy.loginfo("Time difference: %f", time_difference)
   # Set previous_time to (current) message_time for next callback.
   previous_time = message_time
@@ -39,6 +55,11 @@ def imuCallback(imu_msg):
   position[1] += displacement_y
   position[2] += displacement_z
 
+  # Determine time taken to fail 5cm accuracy due to IMU drift.
+  accuracyTest5Cm()
+  # Determine time taken to fail 10cm accuracy due to IMU drift.
+  accuracyTest10Cm()
+
   rospy.loginfo("X: %f, Y: %f, Z: %f", position[0], position[1], position[2])
 
 if __name__ == '__main__':
@@ -47,6 +68,7 @@ if __name__ == '__main__':
   rospy.Subscriber("bno055_node/imu", Imu, imuCallback)
 
   rospy.loginfo("Initial X: %f, Y: %f, Z: %f", position[0], position[1], position[2])
+  # Set starting time stamp to current time.
   previous_time = rospy.get_time()
   rospy.loginfo("Initial time: %f:", previous_time)
  

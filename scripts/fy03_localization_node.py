@@ -47,7 +47,6 @@ def run():
         serialPortDWM1001.write(b'lec')
         serialPortDWM1001.write(b'\r')
         rospy.loginfo("Reading DWM1001 coordinates")
-        rospy.loginfo("test")
     
     else:
         rospy.loginfo("Can't open port: "+ str(serialPortDWM1001.name))
@@ -55,9 +54,7 @@ def run():
 def publish():
     # just read everything from serial port
     serialReadLine = serialPortDWM1001.read_until()
-    
     rospy.loginfo(serialReadLine)
-    #self.pubblishCoordinatesIntoTopics(self.splitByComma(serialReadLine))
     
 def end(rate):
     rospy.loginfo("Quitting, and sending reset command to dev board")
