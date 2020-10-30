@@ -3,7 +3,7 @@
 import rospy
 # from ros_dwm1001.msg import Tag, Anchor
 from sensor_msgs.msg import Imu
-from nav_msgs/Odometry import Odometry
+from nav_msgs.msg import Odometry
 
 class LocalizationNode(object):
     def __init__(self):
@@ -35,6 +35,7 @@ class LocalizationNode(object):
 
     def imuCallback(self, imu_msg):
         # self.publishFusedPose(fused_pose)
+	pass
 
     def publishFusedPose(self, fused_pose):
         # self.fused_pose_pub_.publish(self.fused_pose_msg_)
