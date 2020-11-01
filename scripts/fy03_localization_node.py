@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
 import rospy
-# from ros_dwm1001.msg import Tag, Anchor
+# from ros_dwm1001.msg import UWBTag, UWBAnchor
 from sensor_msgs.msg import Imu
 from nav_msgs.msg import Odometry
 
-class LocalizationNode(object):
+class LocalizationNode:
     def __init__(self):
         #
         # Instantiate Localization object.
