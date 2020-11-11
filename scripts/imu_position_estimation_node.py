@@ -40,7 +40,7 @@ def imuCallback(imu_msg):
   rospy.loginfo("Message sequence: %f, Message time: %f", imu_msg.header.seq, message_time)
   time_difference = message_time - previous_time
   total_time += time_difference 
-  rospy.loginfo("Time difference: %f", time_difference)
+  #rospy.loginfo("Time difference: %f", time_difference)
   # Set previous_time to (current) message_time for next callback.
   previous_time = message_time
 
@@ -78,7 +78,7 @@ def imuCallback(imu_msg):
 if __name__ == '__main__':
  
   rospy.init_node("imu_position_estimation_node") 
-  rospy.Subscriber("bno055_node/imu", Imu, imuCallback)
+  rospy.Subscriber("/imu", Imu, imuCallback)
 
   rospy.loginfo("Initial position X: %f, Y: %f, Z: %f", position["x"], position["y"], position["z"])
   # Set starting time stamp to current time.
