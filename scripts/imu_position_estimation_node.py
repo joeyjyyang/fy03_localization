@@ -10,12 +10,13 @@
 import rospy
 from sensor_msgs.msg import Imu
 
-position = {
+position = 
+{
   "x": 0,
   "y": 0,
   "z": 0
 }
-#position = [0, 0, 0]
+position = [0, 0, 0]
 previous_time = 0
 total_time = 0
 accuracy_5cm = True
@@ -33,6 +34,27 @@ def accuracyTest10Cm():
     accuracy_10cm = False
     rospy.logwarn("Failed 10cm accuracy at in %f seconds.", total_time)
 
+def getRotationMatrix(quaternion):
+  # Normalization
+  s = (x**2 + y**2 + z**2 + w**2)**0.5 
+  
+  r_11 = 1 - 2*s*(y**2 + z**2) 
+  r_12 = 2*s*(x*y - z*w)
+  r_13 = 2*s*(x*z + y*w)
+  r_21 = 2*s*(x*y + z*w)
+  r_22 = 1 - 2*s*(x**2 + z**2)
+  r_23 = 2*s*(y*z - x*w)
+  r_31 = 2*s*(x*z - y*w)
+  r_32 = 2*s*(y*z + x*w)
+  r_33 = 1 - 2*s*(x**2 + y**2)
+  
+  rotation_matrix = 
+  [[r_11, r_12, r_13],
+  [r_21, r_22, r_23],
+  [r_31, r_32, r_33]]
+  
+  return rotation_matrix
+
 def imuCallback(imu_msg):
   global position, previous_time, total_time, accuracy_5cm, accuracy_10cm
   
@@ -40,7 +62,7 @@ def imuCallback(imu_msg):
   rospy.loginfo("Message sequence: %f, Message time: %f", imu_msg.header.seq, message_time)
   time_difference = message_time - previous_time
   total_time += time_difference 
-  rospy.loginfo("Time difference: %f", time_difference)
+  # rospy.loginfo("Time difference: %f", time_difference)
   # Set previous_time to (current) message_time for next callback.
   previous_time = message_time
 
@@ -78,7 +100,7 @@ def imuCallback(imu_msg):
 if __name__ == '__main__':
  
   rospy.init_node("imu_position_estimation_node") 
-  rospy.Subscriber("bno055_node/imu", Imu, imuCallback)
+  rospy.Subscriber("/imu", Imu, imuCallback)
 
   rospy.loginfo("Initial position X: %f, Y: %f, Z: %f", position["x"], position["y"], position["z"])
   # Set starting time stamp to current time.
