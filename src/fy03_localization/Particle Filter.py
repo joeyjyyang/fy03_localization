@@ -5,6 +5,22 @@ import scipy as scipy
 import scipy.stats
 from numpy import *
 
+# Prediction step.
+# Get motion data (control inputs) from IMU,
+# and predict the new positions of all particles.
+def predict(num_particles: int, x_vals: list, y_vals: list, u: list, dt = 1.) -> list:
+    linear_acceleration_x = u[0]
+    linear_acceleration_y = u[1]
+
+    linear_velocity_x = linear_acceleration_x * dt
+    linear_velocity_y = linear_acceleration_y * dt
+    
+    linear_displacement_x = linear_velocity_x * dt
+    linear_displacement_y = linear_velocity_y * dt
+
+    for i in range(num_particles):
+        x_vals[i] += linear_displacement_x
+	y_vals[i] += linear_displacement_y
 
 def random_particles(num_particles: int, x_range: tuple, y_range:tuple) -> list:
     ##make particles
