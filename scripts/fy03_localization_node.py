@@ -25,7 +25,10 @@ class LocalizationNode:
         self.fused_pose_msg_ = Odometry()
         
         self.uwb_tag_sub_ = rospy.Subscriber("/tag", Tag, self.tagCallback)
-        # self.uwb_anchor_sub_ = rospy.Subscriber("/uwb_anchor", Anchor, self.anchorCallback)
+        self.uwb_anchor_sub_ = rospy.Subscriber("/anchor1", Anchor, self.anchor1Callback)
+        self.uwb_anchor_sub_ = rospy.Subscriber("/anchor2", Anchor, self.anchor2Callback)
+        self.uwb_anchor_sub_ = rospy.Subscriber("/anchor3", Anchor, self.anchor3Callback)
+        self.uwb_anchor_sub_ = rospy.Subscriber("/anchor4", Anchor, self.anchor4Callback)
         self.imu_sub_ = rospy.Subscriber("/imu", Imu, self.imuCallback)
         self.fused_pose_pub_ = rospy.Publisher('/fused_pose', Odometry, queue_size = 1)
 
@@ -39,6 +42,8 @@ class LocalizationNode:
     	self.current_estimate = ()
     	self.normalized_weights = []
     	self.UWB_covariance = 0.3
+        self.x_anchors = [0, 0, 0, 0]
+        self.y_anchors = [0, 0, 0, 0]
 
 	# Create initial particles.
     	#self.initialize_particles()
@@ -47,9 +52,21 @@ class LocalizationNode:
         #self.publishFusedPose(fused_pose)
 	rospy.loginfo("Tag X: %f, Tag Y: %f", tag_msg.x, tag_msg.y)
 
-    def anchorCallback(self, anchor_msg):
-        #self.publishFusedPose(fused_pose)
-	pass
+    def anchor1Callback(self, anchor1_msg):
+        self.x_anchors[0] = anchor1_msg.x
+        self.y_anchors[0] = anchor1_msg.y
+    
+    def anchor2Callback(self, anchor2_msg):
+        self.x_anchors[1] = anchor2_msg.x
+        self.y_anchors[1] = anchor2_msg.y
+    
+    def anchor3Callback(self, anchor3_msg):
+        self.x_anchors[2] = anchor3_msg.x
+        self.y_anchors[2] = anchor3_msg.y
+    
+    def anchor4Callback(self, anchor4_msg):
+        self.x_anchors[3] = anchor4_msg.x
+        self.y_anchors[3] = anchor4_msg.y
 
     def imuCallback(self, imu_msg):
     	#message_time = imu_msg.header.stamp.to_sec()
