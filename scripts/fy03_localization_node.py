@@ -104,9 +104,12 @@ class LocalizationNode:
 	    rospy.loginfo("X: %f, Y: %f", self.x_vals[i], self.y_vals[i])
 
     def publishFusedPose(self, fused_pose):
-        # self.fused_pose_pub_.publish(self.fused_pose_msg_)
-        pass
+        self.fused_pose_msg.pose.pose.position.x = fused_pose[0]
+        self.fused_pose_msg.pose.pose.position.y = fused_pose[1]
+        self.fused_pose_msg.pose.pose.position.z = fused_pose[2]
 
+        self.fused_pose_pub_.publish(self.fused_pose_msg_)
+        
     # Initial generation of particle based on uniform distribution.
     def initialize_particles(self):
 	for i in range(self.num_particles):
