@@ -53,6 +53,8 @@ def random_particles(num_particles: int, x_range: tuple, y_range:tuple) -> list:
 def plot_particles(x_vals: list, y_vals: list, weights = 1):
     ##plot particles
     scatter(x_vals, y_vals, weights)
+    xlim([0, 10])
+    ylim([0, 10])
     show()
 
 def find_current_estimate(x_vals: list, y_vals: list, weights: list) -> tuple:
@@ -113,7 +115,7 @@ def re_sample(x_values: list, y_values: list, normalized_weights: list, num_part
         
 def main():
     current_pos = [5,5]
-    num_particles = 10000
+    num_particles = 100
     accel_vector = []
     x_displace = 0
     y_displace = 0
