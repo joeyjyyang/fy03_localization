@@ -46,11 +46,17 @@ class LocalizationNode:
         self.y_anchors = [0, 0, 0, 0]
 
 	# Create initial particles.
-    	#self.initialize_particles()
+    	self.initialize_particles()
     	
     def tagCallback(self, tag_msg):
-        #self.publishFusedPose(fused_pose)
-	rospy.loginfo("Tag X: %f, Tag Y: %f", tag_msg.x, tag_msg.y)
+	#rospy.loginfo("Tag X: %f, Tag Y: %f", tag_msg.x, tag_msg.y)
+
+	tag_observation_x = tag_msg.x
+	tag_observation_y = tag_msg.y
+	# quality_factor = tag_msg.quality_factor	
+
+	z = [tag_observation_x, tag_observation_y]
+	self.update(z)
 
     def anchor1Callback(self, anchor1_msg):
         self.x_anchors[0] = anchor1_msg.x
@@ -69,26 +75,20 @@ class LocalizationNode:
         self.y_anchors[3] = anchor4_msg.y
 
     def imuCallback(self, imu_msg):
-    	#message_time = imu_msg.header.stamp.to_sec()
+ 	#rospy.loginfo("ACC X: %f, ACC Y: %f", imu_msg.linear_acceleration.x, imu_msg.linear_acceleration.y)
+   	
+	#message_time = imu_msg.header.stamp.to_sec()
     	#rospy.loginfo("Message sequence: %f, Message time: %f", imu_msg.header.seq, message_time)
 
-	rospy.loginfo("ACC X: %f, ACC Y: %f", imu_msg.linear_acceleration.x, imu_msg.linear_acceleration.y)
-
-	'''
     	linear_acceleration_x = imu_msg.linear_acceleration.x
     	linear_acceleration_y = imu_msg.linear_acceleration.y
-	u = [linear_acceleration_x, linear_acceleration_y]	
 	
+	u = [linear_acceleration_x, linear_acceleration_y]	
 	self.predict(u)
-        '''
 
     # Prediction step.
     # Get motion data (control inputs) from IMU and move particles.
     def predict(self, u, dt = 0.01): #std: float):
-    	#dist = (u[1] * dt) + (np.random.randn(N) * std[1])
-    	#particles[:, 0] += np.cos(u[0]) * dist
-    	#particles[:, 1] += np.sin(u[0]) * dist
-
     	linear_acceleration_x = u[0]
 	linear_acceleration_y = u[1]
     
@@ -101,21 +101,26 @@ class LocalizationNode:
     	for i in range(self.num_particles):
 	    self.x_vals[i] += linear_displacement_x
 	    self.y_vals[i] += linear_displacement_y
-	    rospy.loginfo("X: %f, Y: %f", self.x_vals[i], self.y_vals[i])
 
+    # Update step.
+    # Get observation of position from UWB and update weights of particles.
+    def update(self, z):
+	# self.UWB_covariance
+	pass
+
+    # Initial generation of particle based on uniform distribution.
+    def initialize_particles(self):
+	for i in range(self.num_particles):
+            self.x_vals.append(uniform(self.x_range[0], self.x_range[1]))
+            self.y_vals.append(uniform(self.y_range[0], self.y_range[1]))
+    
     def publishFusedPose(self, fused_pose):
         self.fused_pose_msg.pose.pose.position.x = fused_pose[0]
         self.fused_pose_msg.pose.pose.position.y = fused_pose[1]
         self.fused_pose_msg.pose.pose.position.z = fused_pose[2]
 
         self.fused_pose_pub_.publish(self.fused_pose_msg_)
-        
-    # Initial generation of particle based on uniform distribution.
-    def initialize_particles(self):
-	for i in range(self.num_particles):
-            self.x_vals.append(uniform(self.x_range[0], self.x_range[1]))
-            self.y_vals.append(uniform(self.y_range[0], self.y_range[1]))
-
+ 
 if __name__ == '__main__':
     rospy.init_node("fy03_localization_node")
     localization_node = LocalizationNode()
