@@ -9,7 +9,7 @@ from matplotlib.pyplot import *
 from random import *
 from math import *
 import scipy as scipy
-#import scipy.stats
+import scipy.stats
 from numpy import *
 
 class LocalizationNode:
@@ -19,6 +19,7 @@ class LocalizationNode:
         # self.localization = Localization()
         #
 
+	# ROS.
         self.tag_msg_ = Tag()
         self.anchor_msg_ = Anchor()
         self.imu_msg_ = Imu()
@@ -33,20 +34,20 @@ class LocalizationNode:
         self.fused_pose_pub_ = rospy.Publisher('/fused_pose', Odometry, queue_size = 1)
 
 	# Particle Filter.	
-	self.num_particles = 1
+	self.num_particles = 10
     	self.x_range = (0,10)
     	self.y_range = (0,10)
-    	self.x_vals = []
-    	self.y_vals = []
-    	self.weights = []
+    	self.x_vals = [0] * self.num_particles
+    	self.y_vals = [0] * self.num_particles
+    	self.weights = [0] * self.num_particles
     	self.current_estimate = ()
-    	self.normalized_weights = []
+    	self.normalized_weights = [0] * self.num_particles
     	self.UWB_covariance = 0.3
         self.x_anchors = [0, 0, 0, 0]
         self.y_anchors = [0, 0, 0, 0]
 
 	# Create initial particles.
-    	self.initialize_particles()
+    	self.initializeParticles()
     	
     def tagCallback(self, tag_msg):
 	#rospy.loginfo("Tag X: %f, Tag Y: %f", tag_msg.x, tag_msg.y)
@@ -105,15 +106,62 @@ class LocalizationNode:
     # Update step.
     # Get observation of position from UWB and update weights of particles.
     def update(self, z):
-	# self.UWB_covariance
+	distance = 0
+	temp_weight = 0
+	for i in range(self.num_particles):
+	    distance = self.p2pDistance(z, self.x_vals[i], self.y_vals[i])
+	    temp_weight = (scipy.stats.norm.pdf(distance, 0, self.UWB_covariance))
+	    if temp_weight == 1:
+		temp_weight = 0
+	    self.weights[i] = temp_weight
+	    self.weights[i] += 0.00000001
+
+	self.normalizeWeights()
+
+	rospy.loginfo("Weights: ")
+	rospy.loginfo(self.weights)
+   
+    # Initial generation of particle based on uniform distribution.
+    def initializeParticles(self):
+	for i in range(self.num_particles):
+            self.x_vals[i] = uniform(self.x_range[0], self.x_range[1])
+            self.y_vals[i] = uniform(self.y_range[0], self.y_range[1])
+
+    # Normalize weights.
+    def normalizeWeights(self):
+	total_weight = 0
+	
+	for weight in self.weights:
+	    total_weight += weight
+	
+	for i in range(self.num_particles):
+	    self.normalized_weights[i] = self.weights[i] / total_weight    
+
+	rospy.loginfo("Normalized Weights: ")
+	rospy.loginfo(self.normalized_weights)
+
+    # Calculates the distance between 2 points.
+    # Specifically, the distance between each particle,
+    # and the UWB measurement of position.
+    def p2pDistance(self, z, x_particle, y_particle):
+	x_measurement = z[0]
+	y_measurement = z[1]
+	x_diff = float(x_measurement - x_particle)
+	y_diff = float(y_measurement - y_particle)
+	distance = sqrt((x_diff**2) + (y_diff**2))
+
+	return distance
+
+    # Resample step.
+    # Regenerate particles with no weights.
+    def resample(self):
 	pass
 
-    # Initial generation of particle based on uniform distribution.
-    def initialize_particles(self):
-	for i in range(self.num_particles):
-            self.x_vals.append(uniform(self.x_range[0], self.x_range[1]))
-            self.y_vals.append(uniform(self.y_range[0], self.y_range[1]))
-    
+    # Determine best approximation based on weighted particles.
+    def getFusedPose(self):
+	pass
+
+    # Publish best approximation to ROS.    
     def publishFusedPose(self, fused_pose):
         self.fused_pose_msg.pose.pose.position.x = fused_pose[0]
         self.fused_pose_msg.pose.pose.position.y = fused_pose[1]
