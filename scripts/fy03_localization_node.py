@@ -20,18 +20,18 @@ class LocalizationNode:
         #
 
 	# ROS.
-        self.imu_msg_ = Imu()
-        self.tag_msg_ = Tag()
-        self.anchor_msg_ = Anchor()
-        self.fused_pose_msg_ = Odometry()
+        self.imu_msg = Imu()
+        self.tag_msg = Tag()
+        self.anchor_msg = Anchor()
+        self.fused_pose_msg = Odometry()
         
-	self.imu_sub_ = rospy.Subscriber("/imu", Imu, self.imuCallback)
-        self.uwb_tag_sub_ = rospy.Subscriber("/tag", Tag, self.tagCallback)
-        self.uwb_anchor_sub_ = rospy.Subscriber("/anchor1", Anchor, self.anchor1Callback)
-        self.uwb_anchor_sub_ = rospy.Subscriber("/anchor2", Anchor, self.anchor2Callback)
-        self.uwb_anchor_sub_ = rospy.Subscriber("/anchor3", Anchor, self.anchor3Callback)
-        self.uwb_anchor_sub_ = rospy.Subscriber("/anchor4", Anchor, self.anchor4Callback)
-        self.fused_pose_pub_ = rospy.Publisher('/fused_pose', Odometry, queue_size = 1)
+	self.imu_sub = rospy.Subscriber("/imu", Imu, self.imuCallback)
+        self.uwb_tag_sub = rospy.Subscriber("/tag", Tag, self.tagCallback)
+        self.uwb_anchor_sub = rospy.Subscriber("/anchor1", Anchor, self.anchor1Callback)
+        self.uwb_anchor_sub = rospy.Subscriber("/anchor2", Anchor, self.anchor2Callback)
+        self.uwb_anchor_sub = rospy.Subscriber("/anchor3", Anchor, self.anchor3Callback)
+        self.uwb_anchor_sub = rospy.Subscriber("/anchor4", Anchor, self.anchor4Callback)
+        self.fused_pose_pub = rospy.Publisher('/fused_pose', Odometry, queue_size = 1)
 
 	# Particle Filter.	
 	self.num_particles = 5
@@ -180,13 +180,13 @@ class LocalizationNode:
     # Publish best approximation to ROS.    
     def publishFusedPose(self):
 	time_stamp = rospy.get_rostime()
-	self.fused_pose_msg_.header.stamp = time_stamp
+	self.fused_pose_msg.header.stamp = time_stamp
 
-        self.fused_pose_msg_.pose.pose.position.x = self.x_fused
-        self.fused_pose_msg_.pose.pose.position.y = self.y_fused
+        self.fused_pose_msg.pose.pose.position.x = self.x_fused
+        self.fused_pose_msg.pose.pose.position.y = self.y_fused
         #self.fused_pose_msg.pose.pose.position.z = fused_pose[2]
 
-        self.fused_pose_pub_.publish(self.fused_pose_msg_)
+        self.fused_pose_pub.publish(self.fused_pose_msg)
  
 if __name__ == '__main__':
     rospy.init_node("fy03_localization_node")
