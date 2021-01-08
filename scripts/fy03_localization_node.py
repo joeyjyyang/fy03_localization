@@ -20,21 +20,21 @@ class LocalizationNode:
         #
 
 	# ROS.
+        self.imu_msg_ = Imu()
         self.tag_msg_ = Tag()
         self.anchor_msg_ = Anchor()
-        self.imu_msg_ = Imu()
         self.fused_pose_msg_ = Odometry()
         
+	self.imu_sub_ = rospy.Subscriber("/imu", Imu, self.imuCallback)
         self.uwb_tag_sub_ = rospy.Subscriber("/tag", Tag, self.tagCallback)
         self.uwb_anchor_sub_ = rospy.Subscriber("/anchor1", Anchor, self.anchor1Callback)
         self.uwb_anchor_sub_ = rospy.Subscriber("/anchor2", Anchor, self.anchor2Callback)
         self.uwb_anchor_sub_ = rospy.Subscriber("/anchor3", Anchor, self.anchor3Callback)
         self.uwb_anchor_sub_ = rospy.Subscriber("/anchor4", Anchor, self.anchor4Callback)
-        self.imu_sub_ = rospy.Subscriber("/imu", Imu, self.imuCallback)
         self.fused_pose_pub_ = rospy.Publisher('/fused_pose', Odometry, queue_size = 1)
 
 	# Particle Filter.	
-	self.num_particles = 10
+	self.num_particles = 5
     	self.x_range = (0,10)
     	self.y_range = (0,10)
     	self.x_vals = [0] * self.num_particles
@@ -45,10 +45,24 @@ class LocalizationNode:
     	self.UWB_covariance = 0.3
         self.x_anchors = [0, 0, 0, 0]
         self.y_anchors = [0, 0, 0, 0]
+	self.x_fused = 0
+	self.y_fused = 0
 
 	# Create initial particles.
     	self.initializeParticles()
-    	
+     
+    def imuCallback(self, imu_msg):
+ 	#rospy.loginfo("ACC X: %f, ACC Y: %f", imu_msg.linear_acceleration.x, imu_msg.linear_acceleration.y)
+   	
+	#message_time = imu_msg.header.stamp.to_sec()
+    	#rospy.loginfo("Message sequence: %f, Message time: %f", imu_msg.header.seq, message_time)
+
+    	linear_acceleration_x = imu_msg.linear_acceleration.x
+    	linear_acceleration_y = imu_msg.linear_acceleration.y
+	
+	u = [linear_acceleration_x, linear_acceleration_y]	
+	self.predict(u)
+	
     def tagCallback(self, tag_msg):
 	#rospy.loginfo("Tag X: %f, Tag Y: %f", tag_msg.x, tag_msg.y)
 
@@ -75,18 +89,6 @@ class LocalizationNode:
         self.x_anchors[3] = anchor4_msg.x
         self.y_anchors[3] = anchor4_msg.y
 
-    def imuCallback(self, imu_msg):
- 	#rospy.loginfo("ACC X: %f, ACC Y: %f", imu_msg.linear_acceleration.x, imu_msg.linear_acceleration.y)
-   	
-	#message_time = imu_msg.header.stamp.to_sec()
-    	#rospy.loginfo("Message sequence: %f, Message time: %f", imu_msg.header.seq, message_time)
-
-    	linear_acceleration_x = imu_msg.linear_acceleration.x
-    	linear_acceleration_y = imu_msg.linear_acceleration.y
-	
-	u = [linear_acceleration_x, linear_acceleration_y]	
-	self.predict(u)
-
     # Prediction step.
     # Get motion data (control inputs) from IMU and move particles.
     def predict(self, u, dt = 0.01): #std: float):
@@ -112,20 +114,25 @@ class LocalizationNode:
 	    distance = self.p2pDistance(z, self.x_vals[i], self.y_vals[i])
 	    temp_weight = (scipy.stats.norm.pdf(distance, 0, self.UWB_covariance))
 	    if temp_weight == 1:
+		rospy.loginfo("true")
 		temp_weight = 0
 	    self.weights[i] = temp_weight
 	    self.weights[i] += 0.00000001
 
 	self.normalizeWeights()
 
-	rospy.loginfo("Weights: ")
-	rospy.loginfo(self.weights)
+	#rospy.loginfo("Weights: ")
+	#rospy.loginfo(self.weights)
    
     # Initial generation of particle based on uniform distribution.
     def initializeParticles(self):
 	for i in range(self.num_particles):
             self.x_vals[i] = uniform(self.x_range[0], self.x_range[1])
             self.y_vals[i] = uniform(self.y_range[0], self.y_range[1])
+
+	rospy.loginfo("Initial particles: ")
+	rospy.loginfo(self.x_vals)
+	rospy.loginfo(self.y_vals)
 
     # Normalize weights.
     def normalizeWeights(self):
@@ -137,8 +144,10 @@ class LocalizationNode:
 	for i in range(self.num_particles):
 	    self.normalized_weights[i] = self.weights[i] / total_weight    
 
-	rospy.loginfo("Normalized Weights: ")
-	rospy.loginfo(self.normalized_weights)
+	self.getFusedPose()
+
+	#rospy.loginfo("Normalized Weights: ")
+	#rospy.loginfo(self.normalized_weights)
 
     # Calculates the distance between 2 points.
     # Specifically, the distance between each particle,
@@ -159,13 +168,23 @@ class LocalizationNode:
 
     # Determine best approximation based on weighted particles.
     def getFusedPose(self):
-	pass
+	self.x_fused = 0
+	self.y_fused = 0
 
+	for i in range(self.num_particles):
+	    self.x_fused += self.x_vals[i] * self.weights[i]
+ 	    self.y_fused += self.y_vals[i] * self.weights[i]
+
+	self.publishFusedPose()
+	
     # Publish best approximation to ROS.    
-    def publishFusedPose(self, fused_pose):
-        self.fused_pose_msg.pose.pose.position.x = fused_pose[0]
-        self.fused_pose_msg.pose.pose.position.y = fused_pose[1]
-        self.fused_pose_msg.pose.pose.position.z = fused_pose[2]
+    def publishFusedPose(self):
+	time_stamp = rospy.get_rostime()
+	self.fused_pose_msg_.header.stamp = time_stamp
+
+        self.fused_pose_msg_.pose.pose.position.x = self.x_fused
+        self.fused_pose_msg_.pose.pose.position.y = self.y_fused
+        #self.fused_pose_msg.pose.pose.position.z = fused_pose[2]
 
         self.fused_pose_pub_.publish(self.fused_pose_msg_)
  
