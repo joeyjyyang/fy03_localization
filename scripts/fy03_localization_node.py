@@ -164,7 +164,28 @@ class LocalizationNode:
     # Resample step.
     # Regenerate particles with no weights.
     def resample(self):
-	pass
+	cum_sum = 0
+	counter = 0
+	prev_x_vals = self.x_vals
+	prev_y_vals = self.y_vals
+	self.x_vals = [0] * self.num_particles
+	self.y_vals = [0] * self.num_particles
+	self.weights = [0] * self.num_particles
+	
+	for i in range(self.num_particles):
+	    cum_sum += self.normalized_weights[i] * float(self.num_particles)
+	    
+	    while (counter < cum_sum):
+	        self.x_vals[i] = random.normal(prev_x_vals[i], self.UWB_covariance)
+		self.y_vals[i] = random.normal(prev_y_vals[i], self.UWB_covariance)
+		counter += 1
+
+	for i in range(self.num_particles):
+	    self.weights[i] = 1
+
+	#rospy.loginfo(self.x_vals)
+	#rospy.loginfo(self.y_vals)
+	#rospy.loginfo(self.weights)
 
     # Determine best approximation based on weighted particles.
     def getFusedPose(self):
@@ -176,6 +197,7 @@ class LocalizationNode:
  	    self.y_fused += self.y_vals[i] * self.weights[i]
 
 	self.publishFusedPose()
+	self.resample()
 	
     # Publish best approximation to ROS.    
     def publishFusedPose(self):
