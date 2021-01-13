@@ -117,6 +117,8 @@ def main():
     current_pos = [5,5]
     num_particles = 100
     accel_vector = []
+    tracked_pos_x = []
+    tracked_pos_y = []
     x_displace = 0
     y_displace = 0
     x_vel = 0
@@ -164,10 +166,14 @@ def main():
 
         current_estimate = find_current_estimate(x_vals, y_vals, normalized_weights)
         print(str(current_estimate[0]) + ', ' + str(current_estimate[1]))
+        tracked_pos_x.append(current_estimate[0])
+        tracked_pos_y.append(current_estimate[1])
 
-        plot_particles(x_vals, y_vals, weights)
+        #plot_particles(x_vals, y_vals, weights)
 
         x_vals, y_vals, weights = re_sample(x_vals, y_vals, normalized_weights, num_particles, UWB_covariance)
-        plot_particles(x_vals, y_vals, weights)
+        #plot_particles(x_vals, y_vals, weights)
+
+    plot_particles(tracked_pos_x, tracked_pos_y)
 
 main()
