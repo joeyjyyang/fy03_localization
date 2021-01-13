@@ -47,37 +47,46 @@ class LocalizationNode:
         self.y_anchors = [0, 0, 0, 0]
 	self.x_fused = 0
 	self.y_fused = 0
+	self.imu_init = False
+	self.uwb_init = False
 
 	# Create initial particles.
     	self.initializeParticles()
      
     def imuCallback(self, imu_msg):
- 	#rospy.loginfo("ACC X: %f, ACC Y: %f", imu_msg.linear_acceleration.x, imu_msg.linear_acceleration.y)
-   	
-	#message_time = imu_msg.header.stamp.to_sec()
-    	#rospy.loginfo("Message sequence: %f, Message time: %f", imu_msg.header.seq, message_time)
+	# Toggle upon first message.
+   	if not self.imu_init:
+		self.imu_init = True
 
-    	linear_acceleration_x = imu_msg.linear_acceleration.x
-    	linear_acceleration_y = imu_msg.linear_acceleration.y
+	if self.checkSensorsInit():
+	    #message_time = imu_msg.header.stamp.to_sec()
+    	    #rospy.loginfo("Message sequence: %f, Message time: %f", imu_msg.header.seq, message_time)
+
+    	    linear_acceleration_x = imu_msg.linear_acceleration.x
+    	    linear_acceleration_y = imu_msg.linear_acceleration.y
 	
-	u = [linear_acceleration_x, linear_acceleration_y]	
-	self.predict(u)
+	    u = [linear_acceleration_x, linear_acceleration_y]	
+	    self.predict(u)
 	
     def tagCallback(self, tag_msg):
-	#rospy.loginfo("Tag X: %f, Tag Y: %f", tag_msg.x, tag_msg.y)
+	# Toggle upon first message.
+	if not self.uwb_init:
+		self.uwb_init = True
 
-	tag_observation_x = tag_msg.x
-	tag_observation_y = tag_msg.y
-	# quality_factor = tag_msg.quality_factor	
+	# Only publish when IMU and UWB both initialized.
+	if self.checkSensorsInit():
+	    tag_observation_x = tag_msg.x
+	    tag_observation_y = tag_msg.y
+	    # quality_factor = tag_msg.quality_factor	
 
-	z = [tag_observation_x, tag_observation_y]
-	self.update(z)
+	    z = [tag_observation_x, tag_observation_y]
+	    self.update(z)
 
     def anchor1Callback(self, anchor1_msg):
         self.x_anchors[0] = anchor1_msg.x
         self.y_anchors[0] = anchor1_msg.y
     
-    def anchor2Callback(self, anchor2_msg):
+    def anchor2Callback(self,  anchor2_msg):
         self.x_anchors[1] = anchor2_msg.x
         self.y_anchors[1] = anchor2_msg.y
     
@@ -88,6 +97,13 @@ class LocalizationNode:
     def anchor4Callback(self, anchor4_msg):
         self.x_anchors[3] = anchor4_msg.x
         self.y_anchors[3] = anchor4_msg.y
+
+    # Check that IMU and UWB sensors are initialized.
+    def checkSensorsInit(self):
+	if self.imu_init and self.uwb_init:
+	    return True
+	else:
+	    return False
 
     # Prediction step.
     # Get motion data (control inputs) from IMU and move particles.
@@ -105,6 +121,8 @@ class LocalizationNode:
 	    self.x_vals[i] += linear_displacement_x
 	    self.y_vals[i] += linear_displacement_y
 
+	#rospy.loginfo("ACC X: %f, ACC Y: %f", linear_acceleration_x, linear_acceleration_y)
+
     # Update step.
     # Get observation of position from UWB and update weights of particles.
     def update(self, z):
@@ -118,12 +136,14 @@ class LocalizationNode:
 		temp_weight = 0
 	    self.weights[i] = temp_weight
 	    self.weights[i] += 0.00000001
-
+	
+	#rospy.loginfo("TAG X: %f, TAG Y: %f", z[0], z[1])
+   
 	self.normalizeWeights()
 
 	#rospy.loginfo("Weights: ")
 	#rospy.loginfo(self.weights)
-   
+
     # Initial generation of particle based on uniform distribution.
     def initializeParticles(self):
 	for i in range(self.num_particles):
