@@ -34,15 +34,15 @@ class LocalizationNode:
         self.fused_pose_pub = rospy.Publisher('/fused_pose', Odometry, queue_size = 1)
 
 	# Particle Filter.	
-	self.num_particles = 5
-    	self.x_range = (0,10)
-    	self.y_range = (0,10)
+	self.num_particles = 1000
+    	self.x_range = (0, 0.3)
+    	self.y_range = (0, 0.3)
     	self.x_vals = [0] * self.num_particles
     	self.y_vals = [0] * self.num_particles
     	self.weights = [0] * self.num_particles
     	self.current_estimate = ()
     	self.normalized_weights = [0] * self.num_particles
-    	self.UWB_covariance = 0.3
+    	self.UWB_covariance = 0.03
         self.x_anchors = [0, 0, 0, 0]
         self.y_anchors = [0, 0, 0, 0]
 	self.x_fused = 0
@@ -132,17 +132,16 @@ class LocalizationNode:
 	    distance = self.p2pDistance(z, self.x_vals[i], self.y_vals[i])
 	    temp_weight = (scipy.stats.norm.pdf(distance, 0, self.UWB_covariance))
 	    if temp_weight == 1:
-		rospy.loginfo("true")
 		temp_weight = 0
 	    self.weights[i] = temp_weight
 	    self.weights[i] += 0.00000001
 	
 	#rospy.loginfo("TAG X: %f, TAG Y: %f", z[0], z[1])
    
-	self.normalizeWeights()
-
 	#rospy.loginfo("Weights: ")
 	#rospy.loginfo(self.weights)
+
+	self.normalizeWeights()
 
     # Initial generation of particle based on uniform distribution.
     def initializeParticles(self):
@@ -150,9 +149,9 @@ class LocalizationNode:
             self.x_vals[i] = uniform(self.x_range[0], self.x_range[1])
             self.y_vals[i] = uniform(self.y_range[0], self.y_range[1])
 
-	rospy.loginfo("Initial particles: ")
-	rospy.loginfo(self.x_vals)
-	rospy.loginfo(self.y_vals)
+	#rospy.loginfo("Initial particles: ")
+	#rospy.loginfo(self.x_vals)
+	#rospy.loginfo(self.y_vals)
 
     # Normalize weights.
     def normalizeWeights(self):
@@ -165,8 +164,7 @@ class LocalizationNode:
 	    self.normalized_weights[i] = self.weights[i] / total_weight    
 
 	self.getFusedPose()
-
-	#rospy.loginfo("Normalized Weights: ")
+	
 	#rospy.loginfo(self.normalized_weights)
 
     # Calculates the distance between 2 points.
@@ -203,18 +201,14 @@ class LocalizationNode:
 	for i in range(self.num_particles):
 	    self.weights[i] = 1
 
-	#rospy.loginfo(self.x_vals)
-	#rospy.loginfo(self.y_vals)
-	#rospy.loginfo(self.weights)
-
     # Determine best approximation based on weighted particles.
     def getFusedPose(self):
 	self.x_fused = 0
 	self.y_fused = 0
 
 	for i in range(self.num_particles):
-	    self.x_fused += self.x_vals[i] * self.weights[i]
- 	    self.y_fused += self.y_vals[i] * self.weights[i]
+	    self.x_fused += self.x_vals[i] * self.normalized_weights[i]
+ 	    self.y_fused += self.y_vals[i] * self.normalized_weights[i]
 
 	self.publishFusedPose()
 	self.resample()
