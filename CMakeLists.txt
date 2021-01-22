@@ -25,6 +25,7 @@ catkin_package(
 catkin_install_python(
    PROGRAMS scripts/fy03_localization_node.py
 	    scripts/imu_position_estimation_node.py
+	    scripts/plotter_node.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
