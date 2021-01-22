@@ -49,6 +49,8 @@ class LocalizationNode:
 	self.y_fused = 0
 	self.imu_init = False
 	self.uwb_init = False
+	self.linear_velocity_x = 0
+	self.linear_velocity_y = 0 
 
 	# Create initial particles.
     	self.initializeParticles()
@@ -56,7 +58,7 @@ class LocalizationNode:
     def imuCallback(self, imu_msg):
 	# Toggle upon first message.
    	if not self.imu_init:
-		self.imu_init = True
+	    self.imu_init = True
 
 	if self.checkSensorsInit():
 	    #message_time = imu_msg.header.stamp.to_sec()
@@ -65,14 +67,14 @@ class LocalizationNode:
     	    linear_acceleration_x = imu_msg.linear_acceleration.x
     	    linear_acceleration_y = imu_msg.linear_acceleration.y
 	    # Filter IMU acceleration values.
-	    u = naiveImuFilter(linear_acceleration_x, linear_acceleration_y)	
+	    u = self.naiveImuFilter(linear_acceleration_x, linear_acceleration_y)	
 	    
 	    self.predict(u)
 	
     def tagCallback(self, tag_msg):
 	# Toggle upon first message.
 	if not self.uwb_init:
-		self.uwb_init = True
+	    self.uwb_init = True
 
 	# Only publish when IMU and UWB both initialized.
 	if self.checkSensorsInit():
@@ -111,10 +113,10 @@ class LocalizationNode:
 	filtered_linear_acceleration_x = 0
 	filtered_linear_acceleration_y = 0
 	
-	if abs(linear_acceleration_x) > 0.02:
+	if abs(linear_acceleration_x) > 0.10:
 	    filtered_linear_acceleration_x = linear_acceleration_x
 	
-	if abs(linear_acceleration_y) > 0.02:
+	if abs(linear_acceleration_y) > 0.10:
 	    filtered_linear_acceleration_y = linear_acceleration_y 
 
 	return [filtered_linear_acceleration_x, filtered_linear_acceleration_y]
@@ -125,11 +127,14 @@ class LocalizationNode:
     	linear_acceleration_x = u[0]
 	linear_acceleration_y = u[1]
     
-    	linear_velocity_x = linear_acceleration_x * dt
-    	linear_velocity_y = linear_acceleration_y * dt
+    	self.linear_velocity_x = self.linear_velocity_x + (linear_acceleration_x * dt)
+    	self.linear_velocity_y = self.linear_velocity_y + (linear_acceleration_y * dt)
+	#rospy.loginfo("%f, %f", self.linear_velocity_x, self.linear_velocity_y)
+	#linear_velocity_x = linear_acceleration_x * dt
+    	#linear_velocity_y = linear_acceleration_y * dt
 
-    	linear_displacement_x = linear_velocity_x * dt
-    	linear_displacement_y = linear_velocity_y * dt
+    	linear_displacement_x = self.linear_velocity_x * dt
+    	linear_displacement_y = self.linear_velocity_y * dt
 
     	for i in range(self.num_particles):
 	    self.x_vals[i] += linear_displacement_x
