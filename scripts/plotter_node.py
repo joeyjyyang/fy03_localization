@@ -13,6 +13,16 @@ class PlotterNode:
         # Instantiate Localization object.
         # self.localization = Localization()
         #
+	
+	self.true_positions = [[0, 0], [1, 1], [2, 2]]
+	self.tag_positions_x = []
+	self.tag_positions_y = []
+	self.anchor1_position = [0, 0]
+	self.anchor2_position = [0, 0]
+	self.anchor3_position = [0, 0]
+	self.anchor4_position = [0, 0]
+	self.fused_positions_x = []	
+	self.fused_positions_y = []
 
 	# ROS.
         self.imu_msg = Imu()
@@ -27,16 +37,6 @@ class PlotterNode:
         self.uwb_anchor_sub = rospy.Subscriber("/anchor3", Anchor, self.anchor3Callback)
         self.uwb_anchor_sub = rospy.Subscriber("/anchor4", Anchor, self.anchor4Callback)
         self.fused_pose_sub = rospy.Subscriber('/fused_pose', Odometry, self.fusedPoseCallback)
-
-	self.true_positions = [[0, 0], [1, 1], [2, 2]]
-	self.tag_positions_x = []
-	self.tag_positions_y = []
-	self.anchor1_position = [0, 0]
-	self.anchor2_position = [0, 0]
-	self.anchor3_position = [0, 0]
-	self.anchor4_position = [0, 0]
-	self.fused_positions_x = []	
-	self.fused_positions_y = []
 
     def imuCallback(self, imu_msg):
     	#linear_acceleration_x = imu_msg.linear_acceleration.x
@@ -70,8 +70,8 @@ class PlotterNode:
     def plot(self):
 	print(self.fused_positions_x)
 	rospy.loginfo("Plotting...")
-	plt.plot(self.fused_positions_x, self.fused_positions_x, "ro")
-	plt.axis([-10, 10, -10, 10])
+	plt.plot(self.fused_positions_x, self.fused_positions_x, "ro", self.tag_positions_x, self.tag_positions_y, "bo")
+	plt.axis([-3, 3, -3, 3])
 	plt.show()
 	
 if __name__ == '__main__':

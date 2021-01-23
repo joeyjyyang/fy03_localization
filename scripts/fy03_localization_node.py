@@ -18,21 +18,7 @@ class LocalizationNode:
         # Instantiate Localization object.
         # self.localization = Localization()
         #
-
-	# ROS.
-        self.imu_msg = Imu()
-        self.tag_msg = Tag()
-        self.anchor_msg = Anchor()
-        self.fused_pose_msg = Odometry()
-        
-	self.imu_sub = rospy.Subscriber("/imu", Imu, self.imuCallback)
-        self.uwb_tag_sub = rospy.Subscriber("/tag", Tag, self.tagCallback)
-        self.uwb_anchor_sub = rospy.Subscriber("/anchor1", Anchor, self.anchor1Callback)
-        self.uwb_anchor_sub = rospy.Subscriber("/anchor2", Anchor, self.anchor2Callback)
-        self.uwb_anchor_sub = rospy.Subscriber("/anchor3", Anchor, self.anchor3Callback)
-        self.uwb_anchor_sub = rospy.Subscriber("/anchor4", Anchor, self.anchor4Callback)
-        self.fused_pose_pub = rospy.Publisher('/fused_pose', Odometry, queue_size = 1)
-
+	
 	# Particle Filter.	
 	self.num_particles = 1000
     	self.x_range = (0, 0.3)
@@ -51,6 +37,20 @@ class LocalizationNode:
 	self.uwb_init = False
 	self.linear_velocity_x = 0
 	self.linear_velocity_y = 0 
+
+	# ROS.
+        self.imu_msg = Imu()
+        self.tag_msg = Tag()
+        self.anchor_msg = Anchor()
+        self.fused_pose_msg = Odometry()
+        
+	self.imu_sub = rospy.Subscriber("/imu", Imu, self.imuCallback)
+        self.uwb_tag_sub = rospy.Subscriber("/tag", Tag, self.tagCallback)
+        self.uwb_anchor_sub = rospy.Subscriber("/anchor1", Anchor, self.anchor1Callback)
+        self.uwb_anchor_sub = rospy.Subscriber("/anchor2", Anchor, self.anchor2Callback)
+        self.uwb_anchor_sub = rospy.Subscriber("/anchor3", Anchor, self.anchor3Callback)
+        self.uwb_anchor_sub = rospy.Subscriber("/anchor4", Anchor, self.anchor4Callback)
+        self.fused_pose_pub = rospy.Publisher('/fused_pose', Odometry, queue_size = 1)
 
 	# Create initial particles.
     	self.initializeParticles()
