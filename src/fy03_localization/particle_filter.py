@@ -80,6 +80,28 @@ def p2p_distance(point1: list, point2: tuple):
     distance = sqrt((x_diff**2) + (y_diff**2))
     return distance
 
+def pythagorean_magnitude(val1: float, val2: float):
+    magnitude = sqrt((val1**2)+(val2**2))
+    return magnitude
+
+def zero_vel_check(zero_vel_matrix: list, current_estimate: tuple, UWB_covariance: float):
+    zero_vel = 1
+    debug_counter = 0
+    for i in(zero_vel_matrix):
+        if((i[0]-UWB_covariance < current_estimate[0])&
+           (i[0]+UWB_covariance > current_estimate[0])&
+           (i[1]-UWB_covariance < current_estimate[1])&
+           (i[1]+UWB_covariance > current_estimate[1])):
+            debug_counter += 1
+        else:
+            zero_vel = 0
+        #print(debug_counter)
+    if(zero_vel == 1):
+        zero_vel_matrix.append(current_estimate)
+    return(zero_vel)
+            
+    
+
 def assign_weights(measurement: list, x_vals: list, y_vals: list, cov: float) -> list:
     location = 0
     weights = []
@@ -112,10 +134,16 @@ def re_sample(x_values: list, y_values: list, normalized_weights: list, num_part
             weights_return.append(1)
 
     return x_return, y_return, weights_return
+
+def sum_list(input_list: list) -> float:
+    ret_val = 0
+    for i in input_list:
+        ret_val += i
+    return ret_val
         
 def main():
     current_pos = [5,5]
-    num_particles = 100
+    num_particles = 10
     accel_vector = []
     tracked_pos_x = []
     tracked_pos_y = []
@@ -123,6 +151,11 @@ def main():
     y_displace = 0
     x_vel = 0
     y_vel = 0
+    vel_tolerance = 1 #tuneable variable
+    low_vel = 0
+    zero_vel_counter = 0
+    zero_vel_matrix = []
+    zero_vel = 0
     x_range = (0,10)
     y_range = (0,10)
     x_vals = []
@@ -131,29 +164,30 @@ def main():
     weights = []
     current_estimate = ()
     normalized_weights = []
-    UWB_covariance = 0.3
+    UWB_covariance = 0.3 #tuneable variable
     myfile = open("traj1.txt", 'r')
 
     x_vals, y_vals = random_particles(num_particles, x_range, y_range)
-    plot_particles(x_vals, y_vals)
+    ##plot_particles(x_vals, y_vals)
 
     ##readfile
     accel_tuple = myfile.readline()
-    print(accel_tuple)
+    #print(accel_tuple)
 
 
     ##while file not at end
 
     for i in myfile:
-        print(i)
+        #print(i)
         accel_vector = string_to_list(i)
-        print(accel_vector)
+        #print(accel_vector)
 
-        x_displace, y_displace, x_vel, y_vel = predict(x_vel, y_vel, x_vals, y_vals, accel_vector)
-
+        x_displace, y_displace, x_vel, y_vel = predict(x_vel, y_vel, x_vals, y_vals, accel_vector)        
 
         current_pos[0] = current_pos[0] + x_displace
         current_pos[1] = current_pos[1] + y_displace
+
+        
         ##make
 
         #print(x_vals, y_vals)
@@ -163,8 +197,27 @@ def main():
 
         weights = assign_weights(current_pos, x_vals, y_vals, UWB_covariance)
         normalized_weights = normalize_weights(weights)
+        #print(normalized_weights)
+        #print(max(normalized_weights))
+        #print(min(normalized_weights))
+        #print(sum_list(normalized_weights))
 
         current_estimate = find_current_estimate(x_vals, y_vals, normalized_weights)
+
+        if(pythagorean_magnitude(x_vel, y_vel)<vel_tolerance):
+            low_vel = 1
+        else:
+            low_vel = 0
+            zero_vel = 0
+
+        if(low_vel == 1):
+            zero_vel = zero_vel_check(zero_vel_matrix, current_estimate, UWB_covariance)
+            if(zero_vel == 1):
+                x_vel, y_vel = 0, 0
+            else:
+                zero_vel_matrix = []
+        print(zero_vel)
+
         print(str(current_estimate[0]) + ', ' + str(current_estimate[1]))
         tracked_pos_x.append(current_estimate[0])
         tracked_pos_y.append(current_estimate[1])
