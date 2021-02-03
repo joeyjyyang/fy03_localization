@@ -84,8 +84,9 @@ def pythagorean_magnitude(val1: float, val2: float):
     magnitude = sqrt((val1**2)+(val2**2))
     return magnitude
 
-def zero_vel_check(zero_vel_matrix: list, current_estimate: tuple, UWB_covariance: float):
+def zero_vel_check(zero_vel_matrix: list, current_estimate: tuple, UWB_covariance: float, sensitivity_parameter: int):
     zero_vel = 1
+    zero_vel_confirmed = 1
     debug_counter = 0
     for i in(zero_vel_matrix):
         if((i[0]-UWB_covariance < current_estimate[0])&
@@ -95,10 +96,13 @@ def zero_vel_check(zero_vel_matrix: list, current_estimate: tuple, UWB_covarianc
             debug_counter += 1
         else:
             zero_vel = 0
+            zero_vel_confirmed  = 0
         #print(debug_counter)
     if(zero_vel == 1):
         zero_vel_matrix.append(current_estimate)
-    return(zero_vel)
+    if(len(zero_vel_matrix) < sensitivity_parameter):
+        zero_vel_confirmed = 0
+    return(zero_vel, zero_vel_confirmed)
             
     
 
@@ -153,9 +157,11 @@ def main():
     y_vel = 0
     vel_tolerance = 1 #tuneable variable
     low_vel = 0
+    zero_vel_sensitivity_parameter = 2
     zero_vel_counter = 0
     zero_vel_matrix = []
     zero_vel = 0
+    zero_vel_confirmed = 0
     x_range = (0,10)
     y_range = (0,10)
     x_vals = []
@@ -211,12 +217,12 @@ def main():
             zero_vel = 0
 
         if(low_vel == 1):
-            zero_vel = zero_vel_check(zero_vel_matrix, current_estimate, UWB_covariance)
-            if(zero_vel == 1):
+            zero_vel, zero_vel_confirmed = zero_vel_check(zero_vel_matrix, current_estimate, UWB_covariance, zero_vel_sensitivity_parameter)
+            if(zero_vel_confirmed == 1):
                 x_vel, y_vel = 0, 0
-            else:
+            elif(zero_vel == 0):
                 zero_vel_matrix = []
-        print(zero_vel)
+        print(zero_vel_confirmed)
 
         print(str(current_estimate[0]) + ', ' + str(current_estimate[1]))
         tracked_pos_x.append(current_estimate[0])
