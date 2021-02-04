@@ -1,5 +1,5 @@
 # fy03_localization
-**A ROS package containing an outdoor localization system that fuses UWB and IMU sensor data.**
+**A ROS package containing an outdoor localization system that fuses UWB and IMU sensor data through a Particle Filter.**
 
 ## Overview
 

@@ -2,7 +2,7 @@
 <package format="2">
   <name>fy03_localization</name>
   <version>0.0.0</version>
-  <description>A ROS package containing an outdoor localization system that fuses UWB and IMU sensor data.</description>
+  <description>A ROS package containing an outdoor localization system that fuses UWB and IMU sensor data through a Particle Filter.</description>
 
   <maintainer email="joeyyang.ai@gmail.com">Joey Yang</maintainer>
   <author email="joeyyang.ai@gmail.com">Joey Yang</author>
