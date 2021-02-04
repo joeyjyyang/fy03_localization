@@ -67,7 +67,7 @@ class LocalizationNode:
     	    linear_acceleration_x = imu_msg.linear_acceleration.x
     	    linear_acceleration_y = imu_msg.linear_acceleration.y
 	    # Filter IMU acceleration values.
-	    u = self.naiveImuFilter(linear_acceleration_x, linear_acceleration_y)	
+	    u = [linear_acceleration_x, linear_acceleration_y]
 	    
 	    self.predict(u)
 	
@@ -107,19 +107,6 @@ class LocalizationNode:
 	    return True
 	else:
 	    return False
-
-    # Naive filter for filtering IMU drift when stationary.
-    def naiveImuFilter(self, linear_acceleration_x, linear_acceleration_y):
-	filtered_linear_acceleration_x = 0
-	filtered_linear_acceleration_y = 0
-	
-	if abs(linear_acceleration_x) > 0.10:
-	    filtered_linear_acceleration_x = linear_acceleration_x
-	
-	if abs(linear_acceleration_y) > 0.10:
-	    filtered_linear_acceleration_y = linear_acceleration_y 
-
-	return [filtered_linear_acceleration_x, filtered_linear_acceleration_y]
 
     # Prediction step.
     # Get motion data (control inputs) from IMU and move particles.
