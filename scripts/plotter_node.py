@@ -24,25 +24,26 @@ class PlotterNode:
 	self.fused_positions_x = []	
 	self.fused_positions_y = []
 
+	#self.imu_position_x = 0
+	#self.imu_position_y = 0
+
 	# ROS.
         self.imu_msg = Imu()
         self.tag_msg = Tag()
         self.anchor_msg = Anchor()
         self.fused_pose_msg = Odometry()
         
-	self.imu_sub = rospy.Subscriber("/imu", Imu, self.imuCallback)
+	#self.imu_sub = rospy.Subscriber("/imu", Imu, self.imuCallback)
         self.uwb_tag_sub = rospy.Subscriber("/tag", Tag, self.tagCallback)
-        self.uwb_anchor_sub = rospy.Subscriber("/anchor1", Anchor, self.anchor1Callback)
-        self.uwb_anchor_sub = rospy.Subscriber("/anchor2", Anchor, self.anchor2Callback)
-        self.uwb_anchor_sub = rospy.Subscriber("/anchor3", Anchor, self.anchor3Callback)
-        self.uwb_anchor_sub = rospy.Subscriber("/anchor4", Anchor, self.anchor4Callback)
+        #self.uwb_anchor_sub = rospy.Subscriber("/anchor1", Anchor, self.anchor1Callback)
+        #self.uwb_anchor_sub = rospy.Subscriber("/anchor2", Anchor, self.anchor2Callback)
+        #self.uwb_anchor_sub = rospy.Subscriber("/anchor3", Anchor, self.anchor3Callback)
+        #self.uwb_anchor_sub = rospy.Subscriber("/anchor4", Anchor, self.anchor4Callback)
         self.fused_pose_sub = rospy.Subscriber('/fused_pose', Odometry, self.fusedPoseCallback)
 
     def imuCallback(self, imu_msg):
-    	#linear_acceleration_x = imu_msg.linear_acceleration.x
-        #linear_acceleration_y = imu_msg.linear_acceleration.y
 	pass
-	
+
     def tagCallback(self, tag_msg):
 	self.tag_positions_x.append(tag_msg.x)
     	self.tag_positions_y.append(tag_msg.y)
@@ -66,21 +67,25 @@ class PlotterNode:
     def fusedPoseCallback(self, fused_pose_msg):
 	self.fused_positions_x.append(fused_pose_msg.pose.pose.position.x)
 	self.fused_positions_y.append(fused_pose_msg.pose.pose.position.y)
-
-    def plot(self):
-	print(self.fused_positions_x)
-	rospy.loginfo("Plotting...")
-	plt.plot(self.fused_positions_x, self.fused_positions_x, "ro", self.tag_positions_x, self.tag_positions_y, "bo")
-	plt.axis([-3, 3, -3, 3])
-	plt.show()
 	
+
+def plot(msg):
+	plt.plot(1, 5, '*')
+	plt.axis("equal")
+	plt.draw()
+	plt.pause(0.01)
+
 if __name__ == '__main__':
     rospy.init_node("plotter_node")
     plotter_node = PlotterNode()
 
-    rospy.on_shutdown(plotter_node.plot)
+    imu_sub = rospy.Subscriber("/imu", Imu, plot)
+ 
+    #rospy.on_shutdown(CLEANUP_FUNCTION)
 
     try:
+	plt.ion()
+	plt.show()	
   	rospy.spin() 
     except rospy.ROSInterruptException:
         pass

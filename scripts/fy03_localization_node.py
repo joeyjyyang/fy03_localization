@@ -207,6 +207,7 @@ class LocalizationNode:
             zero_vel = True
         
         return zero_vel
+
     # Normalize weights.
     def normalizeWeights(self):
 		total_weight = 0
