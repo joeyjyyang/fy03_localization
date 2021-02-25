@@ -107,7 +107,6 @@ if __name__ == '__main__':
  
     rospy.init_node("imu_position_estimation_node") 
     imu_sub = rospy.Subscriber("/imu", Imu, imuCallback)
-    imu_position_pub = rospy.Publisher(
 
     rospy.loginfo("Initial position X: %f, Y: %f, Z: %f", position["x"], position["y"], position["z"])
  

@@ -3,6 +3,4 @@
   <include file="$(find ros_bno055)/launch/bno055_imu.launch"/>
 
   <node name="imu_position_estimation_node" pkg="fy03_localization" type="imu_position_estimation_node.py" respawn="false" output="screen"/>
-
-  <node name="plotter_node" pkg="fy03_localization" type="plotter_node.py" respawn="false" output="screen"/>
 </launch>
