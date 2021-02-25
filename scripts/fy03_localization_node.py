@@ -28,7 +28,7 @@ class LocalizationNode:
     	self.weights = [0] * self.num_particles
     	self.current_estimate = ()
     	self.normalized_weights = [0] * self.num_particles
-    	self.UWB_covariance = 0.03
+    	self.UWB_covariance = 0.03 #tuneable variable
         self.x_anchors = [0, 0, 0, 0]
         self.y_anchors = [0, 0, 0, 0]
 	self.x_fused = 0
@@ -37,6 +37,15 @@ class LocalizationNode:
 	self.uwb_init = False
 	self.linear_velocity_x = 0
 	self.linear_velocity_y = 0 
+        
+        # Zero Velocity Detector
+        self.vel_tolerance = 1.0 #tuneable variable
+        self.low_vel = 0
+        self.zero_vel_counter = 0
+        self.zero_vel_matrix = []
+        self.zero_vel = 0
+        self.zero_vel_sensitivity_parameter = 2    
+        self.zero_vel_confirmed = 0
 
 	# ROS.
         self.imu_msg = Imu()
@@ -116,9 +125,19 @@ class LocalizationNode:
     
     	self.linear_velocity_x = self.linear_velocity_x + (linear_acceleration_x * dt)
     	self.linear_velocity_y = self.linear_velocity_y + (linear_acceleration_y * dt)
-	#rospy.loginfo("%f, %f", self.linear_velocity_x, self.linear_velocity_y)
-	#linear_velocity_x = linear_acceleration_x * dt
-    	#linear_velocity_y = linear_acceleration_y * dt
+
+        linear_velocity_magnitude = sqrt((self.linear_velocity_x**2) + (self.linear_velocity_y**2))
+        
+        # If velocity is under the tolerance, check for zero velocity!
+        if linear_velocity_magnitude < self.vel_tolerance:
+            self.zero_vel, zero_vel_confirmed = zero_vel_check(zero_vel_matrix, current_estimate, UWB_covariance, zero_vel_sensitivity_parameter)
+            if(zero_vel_confirmed == 1):
+                x_vel, y_vel = 0, 0
+            elif(zero_vel == 0):
+                zero_vel_matrix = []
+        print(zero_vel_confirmed)
+
+
 
     	linear_displacement_x = self.linear_velocity_x * dt
     	linear_displacement_y = self.linear_velocity_y * dt
@@ -158,6 +177,26 @@ class LocalizationNode:
 	#rospy.loginfo("Initial particles: ")
 	#rospy.loginfo(self.x_vals)
 	#rospy.loginfo(self.y_vals)
+
+    def zero_vel_check(zero_vel_matrix: list, current_estimate: tuple, UWB_covariance: float, sensitivity_parameter: int):
+        zero_vel = 1
+        zero_vel_confirmed = 1
+        debug_counter = 0
+        for i in(self.zero_vel_matrix):
+            if((i[0] - self.UWB_covariance < current_estimate[0])&
+               (i[0] + self.UWB_covariance > current_estimate[0])&
+               (i[1] - self.UWB_covariance < current_estimate[1])&
+               (i[1] + self.UWB_covariance > current_estimate[1])):
+                debug_counter += 1
+            else:
+                zero_vel = 0
+                zero_vel_confirmed  = 0
+            #print(debug_counter)
+        if(zero_vel == 1):
+            zero_vel_matrix.append(current_estimate)
+        if(len(zero_vel_matrix) < sensitivity_parameter):
+            zero_vel_confirmed = 0
+        return(zero_vel, zero_vel_confirmed)
 
     # Normalize weights.
     def normalizeWeights(self):
