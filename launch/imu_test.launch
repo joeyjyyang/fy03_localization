@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<launch>
+  <include file="$(find ros_bno055)/launch/bno055_imu.launch"/>
+
+  <node pkg="imu_filter_madgwick" type="imu_filter_node" name="imu_filter_node" output="screen">
+    <param name="use_mag" value="true"/>
+    <param name="use_magnetic_field_msg" value="true"/>
+    <param name="remove_gravity_vector" value="false"/>
+
+    <remap from="/imu/data_raw" to="/imu"/>
+    <remap from="/imu/mag" to="/imu/magnetic_field"/>
+  </node>
+  
+  <node name="rviz1" pkg="rviz" type="rviz" required="true" args="-d $(find fy03_localization)/rviz/imu.rviz"/>
+  <node name="rviz2" pkg="rviz" type="rviz" required="true" args="-d $(find fy03_localization)/rviz/imu_madgwick.rviz"/>
+</launch>

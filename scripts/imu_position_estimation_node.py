@@ -67,10 +67,10 @@ def imuCallback(imu_msg):
     start = True
   else:
     message_time = imu_msg.header.stamp.to_sec()
-    rospy.loginfo("Message sequence: %f, Message time: %f", imu_msg.header.seq, message_time)
+    #rospy.loginfo("Message sequence: %f, Message time: %f", imu_msg.header.seq, message_time)
     time_difference = message_time - previous_time
     total_time += time_difference 
-    rospy.loginfo("Time difference: %f", time_difference)
+    #rospy.loginfo("Time difference: %f", time_difference)
     # Set previous_time to (current) message_time for next callback.
     previous_time = message_time
 
@@ -99,14 +99,14 @@ def imuCallback(imu_msg):
     rospy.loginfo("Position X: %f, Y: %f, Z: %f", position["x"], position["y"], position["z"])
     
     # Determine time taken to fail 5cm accuracy due to IMU drift.
-    accuracyTest5Cm()
+    #accuracyTest5Cm()
     # Determine time taken to fail 10cm accuracy due to IMU drift.
-    accuracyTest10Cm()
+    #accuracyTest10Cm()
 
 if __name__ == '__main__':
  
     rospy.init_node("imu_position_estimation_node") 
-    rospy.Subscriber("/imu", Imu, imuCallback)
+    imu_sub = rospy.Subscriber("/imu", Imu, imuCallback)
 
     rospy.loginfo("Initial position X: %f, Y: %f, Z: %f", position["x"], position["y"], position["z"])
  
