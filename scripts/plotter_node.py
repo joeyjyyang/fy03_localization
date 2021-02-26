@@ -33,16 +33,22 @@ class PlotterNode:
         self.anchor_msg = Anchor()
         self.fused_pose_msg = Odometry()
         
-	#self.imu_sub = rospy.Subscriber("/imu", Imu, self.imuCallback)
+	self.imu_sub = rospy.Subscriber("/imu", Imu, self.imuCallback)
         self.uwb_tag_sub = rospy.Subscriber("/tag", Tag, self.tagCallback)
-        #self.uwb_anchor_sub = rospy.Subscriber("/anchor1", Anchor, self.anchor1Callback)
-        #self.uwb_anchor_sub = rospy.Subscriber("/anchor2", Anchor, self.anchor2Callback)
-        #self.uwb_anchor_sub = rospy.Subscriber("/anchor3", Anchor, self.anchor3Callback)
-        #self.uwb_anchor_sub = rospy.Subscriber("/anchor4", Anchor, self.anchor4Callback)
+        self.uwb_anchor_sub = rospy.Subscriber("/anchor1", Anchor, self.anchor1Callback)
+        self.uwb_anchor_sub = rospy.Subscriber("/anchor2", Anchor, self.anchor2Callback)
+        self.uwb_anchor_sub = rospy.Subscriber("/anchor3", Anchor, self.anchor3Callback)
+        self.uwb_anchor_sub = rospy.Subscriber("/anchor4", Anchor, self.anchor4Callback)
         self.fused_pose_sub = rospy.Subscriber('/fused_pose', Odometry, self.fusedPoseCallback)
 
+    	plt.ion()
+	plt.show()
+
     def imuCallback(self, imu_msg):
-	pass
+	plt.plot(1, 5, '*')
+	plt.axis("equal")
+	plt.draw()
+	plt.pause(0.01)
 
     def tagCallback(self, tag_msg):
 	self.tag_positions_x.append(tag_msg.x)
@@ -68,7 +74,6 @@ class PlotterNode:
 	self.fused_positions_x.append(fused_pose_msg.pose.pose.position.x)
 	self.fused_positions_y.append(fused_pose_msg.pose.pose.position.y)
 	
-
 def plot(msg):
 	plt.plot(1, 5, '*')
 	plt.axis("equal")
@@ -79,13 +84,11 @@ if __name__ == '__main__':
     rospy.init_node("plotter_node")
     plotter_node = PlotterNode()
 
-    imu_sub = rospy.Subscriber("/imu", Imu, plot)
+    #imu_sub = rospy.Subscriber("/imu", Imu, plot)
  
     #rospy.on_shutdown(CLEANUP_FUNCTION)
 
     try:
-	plt.ion()
-	plt.show()	
   	rospy.spin() 
     except rospy.ROSInterruptException:
         pass
