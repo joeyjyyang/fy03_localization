@@ -1,6 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-  <include file="$(find ros_bno055)/launch/bno055_imu.launch"/>
-
-  <node name="plotter_node" pkg="fy03_localization" type="plotter_node.py" respawn="false" output="screen"/>
-</launch>
