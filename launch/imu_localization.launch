@@ -5,8 +5,8 @@
   <node name="imu_localization_node" pkg="fy03_localization" type="imu_localization_node.py" respawn="false" output="screen"/>
 
   <node pkg="imu_filter_madgwick" type="imu_filter_node" name="imu_filter_node" output="screen">
-     <param name="use_mag" value="true"/>
-     <param name="use_magnetic_field_msg" value="true"/>
+     <param name="use_mag" value="false"/>
+     <param name="use_magnetic_field_msg" value="false"/>
      <param name="remove_gravity_vector" value="true"/>
 
      <remap from="/imu/data_raw" to="/imu"/>
