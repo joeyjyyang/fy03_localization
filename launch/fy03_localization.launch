@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<xml version="1.0"?>
 <launch>
  <include file="$(find ros_dwm1001)/launch/dwm1001_uwb.launch"/>
  

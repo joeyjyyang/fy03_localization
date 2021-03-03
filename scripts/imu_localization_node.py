@@ -112,6 +112,6 @@ if __name__ == '__main__':
     rospy.init_node("imu_localization_node") 
     rospy.loginfo("Initial position X: %f, Y: %f, Z: %f", position["x"], position["y"], position["z"])
  
-    imu_sub = rospy.Subscriber("/imu/data", Imu, imuCallback)
+    imu_sub = rospy.Subscriber("/imu", Imu, imuCallback)
 
     rospy.spin()
