@@ -7,6 +7,9 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   sensor_msgs
   nav_msgs
+  tf2_ros
+  visualization_msgs
+  geometry_msgs
 )
 
 catkin_python_setup()
@@ -16,9 +19,10 @@ generate_messages(
   std_msgs
   sensor_msgs
   nav_msgs
+  visualization_msgs
 )
 
 catkin_package(
-  CATKIN_DEPENDS rospy std_msgs message_runtime sensor_msgs nav_msgs
+  CATKIN_DEPENDS rospy std_msgs message_runtime sensor_msgs nav_msgs tf2_ros visualization_msgs geometry_msgs
 )
 
