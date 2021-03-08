@@ -44,13 +44,9 @@ class LocalizationNode:
 	self.linear_velocity_y = 0 # IMU dead-reckoning linear velocity y value
         
         # Zero Velocity Detector
-        self.vel_tolerance = 1.0 #tuneable variable
-        self.low_vel = 0
-        self.zero_vel_counter = 0
-        self.zero_vel_matrix = []
-        self.zero_vel = 0
-        self.zero_vel_sensitivity_parameter = 2    
-        self.zero_vel_confirmed = 0
+        self.vel_tolerance = 0.3 #tuneable variable
+        self.zero_vel_matrix = [] # Stores previous tag positions in instances of zero velocity
+        self.zero_vel_sensitivity_parameter = 5 #tuneable variable 
 
 	# ROS
         self.imu_sub = rospy.Subscriber("/imu/data", Imu, self.imuCallback)
@@ -117,18 +113,15 @@ class LocalizationNode:
     
     	self.linear_velocity_x = self.linear_velocity_x + (linear_acceleration_x * dt)
     	self.linear_velocity_y = self.linear_velocity_y + (linear_acceleration_y * dt)
-	"""
+	
         linear_velocity_magnitude = sqrt((self.linear_velocity_x**2) + (self.linear_velocity_y**2))
         
         # If velocity is under the tolerance, check for zero velocity!
         if linear_velocity_magnitude < self.vel_tolerance:
-            self.zero_vel, zero_vel_confirmed = zero_vel_check(zero_vel_matrix, current_estimate, UWB_covariance, zero_vel_sensitivity_parameter)
-    	
-        if(zero_vel_confirmed == 1):
-	    x_vel, y_vel = 0, 0
-    	elif(zero_vel == 0):
-	    zero_vel_matrix = []
-	"""
+    	    if self.zeroVelocityCheck():
+	    	self.linear_velocity_x = 0
+	        self.linear_velocity_y = 0   
+ 	
     	linear_displacement_x = self.linear_velocity_x * dt
     	linear_displacement_y = self.linear_velocity_y * dt
 
@@ -157,54 +150,35 @@ class LocalizationNode:
 	for i in range(self.num_particles):
             self.x_vals[i] = uniform(self.x_range[0], self.x_range[1])
             self.y_vals[i] = uniform(self.y_range[0], self.y_range[1])
-    """
+
     # Triggerd by potentially low velocity reading from IMU.
     # Verifies the current instance as an instance of truly zero velocity.
     def zeroVelocityCheck(self):
-        zero_vel = False
+        zero_vel = True
+	zero_vel_confirm = True
 
         # Compare last read (current) UWB tag position with previous UWB tag positions
         for previous_tag_pose in self.zero_vel_matrix:
-            if((previous_tag_pose[0] - self.UWB_covariance < self.x_tag) &
+	    # If last read (current) UWB tag position is NOT within range of all previous UWB tag positions,
+	    # then it is NOT an instance of zero velocity.
+            if not ((previous_tag_pose[0] - self.UWB_covariance < self.x_tag) &
                (previous_tag_pose[0] + self.UWB_covariance > self.x_tag) &
                (previous_tag_pose[1] - self.UWB_covariance < self.y_tag) &
                (previous_tag_pose[1] + self.UWB_covariance > self.y_tag)):
-            else:
-                zero_vel = 0
-                zero_vel_confirmed  = 0
+		zero_vel = False
 
         # If instance of zero velocity, add current tag pose to matrix.
-        if self.zero_vel == 1:
+        if zero_vel:
             self.zero_vel_matrix.append([self.x_tag, self.y_tag])
+	else:
+	    self.zero_vel_matrix = []
 
         # If number of zero velocity instances exceed threshold, notify zero velocity.
-        if len(self.zero_vel_matrix) < self.sensitivity_parameter:
-            zero_vel = False
-        else:
-            zero_vel = True
+        if len(self.zero_vel_matrix) < self.zero_vel_sensitivity_parameter:
+            zero_vel_confirm = False
         
-        return zero_vel
+        return zero_vel_confirm
     
-    def zero_vel_check(zero_vel_matrix: list, current_estimate: tuple, UWB_covariance: float, sensitivity_parameter: int):
-        zero_vel = 1
-        zero_vel_confirmed = 1
-        debug_counter = 0
-        for i in(self.zero_vel_matrix):
-            if((i[0] - self.UWB_covariance < current_estimate[0])&
-               (i[0] + self.UWB_covariance > current_estimate[0])&
-               (i[1] - self.UWB_covariance < current_estimate[1])&
-               (i[1] + self.UWB_covariance > current_estimate[1])):
-                debug_counter += 1
-            else:
-                zero_vel = 0
-                zero_vel_confirmed  = 0
-            #print(debug_counter)
-        if(zero_vel == 1):
-            zero_vel_matrix.append(current_estimate)
-        if(len(zero_vel_matrix) < sensitivity_parameter):
-            zero_vel_confirmed = 0
-        return(zero_vel, zero_vel_confirmed)
-    """
     # Normalize weights.
     def normalizeWeights(self):
 	total_weight = 0
@@ -276,8 +250,6 @@ class LocalizationNode:
 
         self.fused_pose_msg.pose.pose.position.x = self.x_fused
         self.fused_pose_msg.pose.pose.position.y = self.y_fused
-
-        self.fused_pose_pub.publish(self.fused_pose_msg)
 
 	# Populate odom->base_link transform
         self.odom_base_link_tf.header.stamp = time_stamp
