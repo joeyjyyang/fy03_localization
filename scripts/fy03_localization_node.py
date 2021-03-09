@@ -27,7 +27,7 @@ class LocalizationNode:
 	self.uwb_init = False
 
 	# Particle Filter.	
-	self.num_particles = 1000
+	self.num_particles = 30
     	self.x_range = (0, 2.0) # Size of 
     	self.y_range = (0, 2.0)
     	self.x_vals = [0] * self.num_particles # Initialize x coords of particles
@@ -35,7 +35,7 @@ class LocalizationNode:
     	self.weights = [0] * self.num_particles # Initialize weights of particles
     	self.current_estimate = ()
     	self.normalized_weights = [0] * self.num_particles # Initialize normalized weights of particles
-    	self.UWB_covariance = 0.03 #tuneable variable
+    	self.UWB_covariance = 0.1 #tuneable variable
 	self.x_tag = 0 # Tag x coord from UWB
 	self.y_tag = 0 # Tag y coord from UWB
 	self.x_fused = 0 # Fusion x coord from PF
