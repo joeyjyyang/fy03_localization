@@ -27,22 +27,26 @@ class LocalizationNode:
 	self.uwb_init = False
 
 	# Particle Filter.	
-	self.num_particles = 30
-    	self.x_range = (0, 2.0) # Size of 
-    	self.y_range = (0, 2.0)
-    	self.x_vals = [0] * self.num_particles # Initialize x coords of particles
+        # Tuneable
+	self.num_particles = 50
+    	self.x_range = (0, 2.85) # Size of 
+    	self.y_range = (0, 5.5)
+        self.distance_std_dev = 1.0 #tuneable variable
+        self.UWB_covariance = 0.1 #tuneable variable
+
+        # Constants
+	self.x_vals = [0] * self.num_particles # Initialize x coords of particles
     	self.y_vals = [0] * self.num_particles # Initialize y coords of particles
     	self.weights = [0] * self.num_particles # Initialize weights of particles
     	self.current_estimate = ()
     	self.normalized_weights = [0] * self.num_particles # Initialize normalized weights of particles
-    	self.UWB_covariance = 0.1 #tuneable variable
 	self.x_tag = 0 # Tag x coord from UWB
 	self.y_tag = 0 # Tag y coord from UWB
 	self.x_fused = 0 # Fusion x coord from PF
 	self.y_fused = 0 # Fusion y coord from PF
 	self.linear_velocity_x = 0 # IMU dead-reckoning linear velocity x value
 	self.linear_velocity_y = 0 # IMU dead-reckoning linear velocity y value
-        
+
         # Zero Velocity Detector
         self.vel_tolerance = 0.3 #tuneable variable
         self.zero_vel_matrix = [] # Stores previous tag positions in instances of zero velocity
@@ -55,7 +59,7 @@ class LocalizationNode:
 	self.fused_pose_msg = Odometry()
        	self.odom_base_link_br = tf2_ros.TransformBroadcaster()
         self.odom_base_link_tf = TransformStamped()
-	
+
 	# Create initial particles.
     	self.initializeParticles()
      
@@ -63,7 +67,7 @@ class LocalizationNode:
 	# Toggle upon first message.
 	if not self.imu_init:
 	    self.imu_init = True
-
+        
 	if self.checkSensorsInit():
             # Populate orientation data (not estimated through particle filter)
     	    self.fused_pose_msg.pose.pose.orientation.x = imu_msg.orientation.x
@@ -137,10 +141,10 @@ class LocalizationNode:
 
 	for i in range(self.num_particles):
 	    distance = self.p2pDistance(z, self.x_vals[i], self.y_vals[i])
-	    temp_weight = (scipy.stats.norm.pdf(distance, 0, self.UWB_covariance))
+	    temp_weight = (scipy.stats.norm.pdf(distance, 0, self.distance_std_dev))
 	    if temp_weight == 1:
-			temp_weight = 0
-	    self.weights[i] = temp_weight
+		temp_weight = 0
+            self.weights[i] = temp_weight
 	    self.weights[i] += 0.00000001
 
 	self.normalizeWeights()
@@ -214,6 +218,8 @@ class LocalizationNode:
 	self.y_vals = [0] * self.num_particles
 	self.weights = [0] * self.num_particles
 	
+        #rospy.loginfo(self.x_vals)
+
 	for i in range(self.num_particles):
 	    cum_sum += self.normalized_weights[i] * float(self.num_particles)
 	    
@@ -233,7 +239,7 @@ class LocalizationNode:
 	for i in range(self.num_particles):
 	    self.x_fused += self.x_vals[i] * self.normalized_weights[i]
 	    self.y_fused += self.y_vals[i] * self.normalized_weights[i]
-
+        
 	self.publishFusedPose()
 	self.resample()
 	
@@ -266,6 +272,8 @@ class LocalizationNode:
 if __name__ == '__main__':
     rospy.init_node("fy03_localization_node")
     localization_node = LocalizationNode()
+
+    rospy.loginfo ("running node")
 
     try:
   	rospy.spin() 
