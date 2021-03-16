@@ -14,21 +14,14 @@ from math import *
 import scipy as scipy
 import scipy.stats
 from numpy import *
+import threading
 
 class LocalizationNode:
+    
     def __init__(self):
-        #
-        # Instantiate Localization object.
-        # self.localization = Localization()
-        #
-	
-	# Sensor initialization flags	
-	self.imu_init = False
-	self.uwb_init = False
-
 	# Particle Filter.	
         # Tuneable
-	self.num_particles = 50
+	self.num_particles = 10000
     	self.x_range = (0, 2.85) # Size of 
     	self.y_range = (0, 5.5)
         self.distance_std_dev = 1.0 #tuneable variable
@@ -53,8 +46,8 @@ class LocalizationNode:
         self.zero_vel_sensitivity_parameter = 5 #tuneable variable 
 
 	# ROS
-        self.imu_sub = rospy.Subscriber("/imu/data", Imu, self.imuCallback)
-        self.uwb_tag_sub = rospy.Subscriber("/tag", Marker, self.tagCallback)
+        self.imu_sub = rospy.Subscriber("/imu/data", Imu, self.imuCallback, queue_size = 1)
+        self.uwb_tag_sub = rospy.Subscriber("/tag", Marker, self.tagCallback, queue_size = 1)
         self.fused_pose_pub = rospy.Publisher('/fused_pose', Odometry, queue_size = 1)
 	self.fused_pose_msg = Odometry()
        	self.odom_base_link_br = tf2_ros.TransformBroadcaster()
@@ -62,50 +55,35 @@ class LocalizationNode:
 
 	# Create initial particles.
     	self.initializeParticles()
-     
-    def imuCallback(self, imu_msg):
-	# Toggle upon first message.
-	if not self.imu_init:
-	    self.imu_init = True
         
-	if self.checkSensorsInit():
-            # Populate orientation data (not estimated through particle filter)
-    	    self.fused_pose_msg.pose.pose.orientation.x = imu_msg.orientation.x
-    	    self.fused_pose_msg.pose.pose.orientation.y = imu_msg.orientation.y
-    	    self.fused_pose_msg.pose.pose.orientation.z = imu_msg.orientation.z
-    	    self.fused_pose_msg.pose.pose.orientation.w = imu_msg.orientation.w
+        # Start thread.
+        update_thread = threading.Thread(target = self.runUpdate)
+        update_thread.daemon = True
+        update_thread.start()
 
- 	    # Populate orientation data for transform broadcaster
-	    self.odom_base_link_tf.transform.rotation.x = imu_msg.orientation.x
-            self.odom_base_link_tf.transform.rotation.y = imu_msg.orientation.y
-            self.odom_base_link_tf.transform.rotation.z = imu_msg.orientation.z
-            self.odom_base_link_tf.transform.rotation.w = imu_msg.orientation.w
-        
-	    # Send acceleration data to particle filter
-	    linear_acceleration_x = imu_msg.linear_acceleration.x
-    	    linear_acceleration_y = imu_msg.linear_acceleration.y
-	    u = [linear_acceleration_x, linear_acceleration_y]
-            self.predict(u)
+    def imuCallback(self, imu_msg):
+        # Populate orientation data (not estimated through particle filter)
+        self.fused_pose_msg.pose.pose.orientation.x = imu_msg.orientation.x
+        self.fused_pose_msg.pose.pose.orientation.y = imu_msg.orientation.y
+        self.fused_pose_msg.pose.pose.orientation.z = imu_msg.orientation.z
+        self.fused_pose_msg.pose.pose.orientation.w = imu_msg.orientation.w
+
+        # Populate orientation data for transform broadcaster
+        self.odom_base_link_tf.transform.rotation.x = imu_msg.orientation.x
+        self.odom_base_link_tf.transform.rotation.y = imu_msg.orientation.y
+        self.odom_base_link_tf.transform.rotation.z = imu_msg.orientation.z
+        self.odom_base_link_tf.transform.rotation.w = imu_msg.orientation.w
+    
+        # Send acceleration data to particle filter
+        linear_acceleration_x = imu_msg.linear_acceleration.x
+        linear_acceleration_y = imu_msg.linear_acceleration.y
+        u = [linear_acceleration_x, linear_acceleration_y]
+        #self.predict(u)
 	
     def tagCallback(self, tag_msg):
-	# Toggle upon first message.
-	if not self.uwb_init:
-	    self.uwb_init = True
-
-	# Only publish when IMU and UWB both initialized.
-	if self.checkSensorsInit():
-	    self.x_tag = tag_msg.pose.position.x
-	    self.y_tag = tag_msg.pose.position.y
-	    # quality_factor = tag_msg.quality_factor	
-	    z = [self.x_tag, self.y_tag]
-	    self.update(z)
-
-    # Check that IMU and UWB sensors are initialized.
-    def checkSensorsInit(self):
-	if self.imu_init and self.uwb_init:
-	    return True
-	else:
-	    return False
+        self.x_tag = tag_msg.pose.position.x
+        self.y_tag = tag_msg.pose.position.y
+        # quality_factor = tag_msg.quality_factor	
 
     # Prediction step.
     # Get motion data (control inputs) from IMU and move particles.
@@ -133,14 +111,20 @@ class LocalizationNode:
 	    self.x_vals[i] += linear_displacement_x
 	    self.y_vals[i] += linear_displacement_y
 
+    def runUpdate(self):
+        while True:
+            self.update()
+
     # Update step.
     # Get observation of position from UWB and update weights of particles.
-    def update(self, z):
+    def update(self):
+        rospy.loginfo("threading..")
+
 	distance = 0
 	temp_weight = 0
 
 	for i in range(self.num_particles):
-	    distance = self.p2pDistance(z, self.x_vals[i], self.y_vals[i])
+	    distance = self.p2pDistance(self.x_vals[i], self.y_vals[i])
 	    temp_weight = (scipy.stats.norm.pdf(distance, 0, self.distance_std_dev))
 	    if temp_weight == 1:
 		temp_weight = 0
@@ -198,11 +182,9 @@ class LocalizationNode:
     # Calculates the distance between 2 points.
     # Specifically, the distance between each particle,
     # and the UWB measurement of position.
-    def p2pDistance(self, z, x_particle, y_particle):
-	x_measurement = z[0]
-	y_measurement = z[1]
-	x_diff = float(x_measurement - x_particle)
-	y_diff = float(y_measurement - y_particle)
+    def p2pDistance(self, x_particle, y_particle):
+	x_diff = float(self.x_tag - x_particle)
+	y_diff = float(self.y_tag - y_particle)
 	distance = sqrt((x_diff**2) + (y_diff**2))
 
 	return distance
@@ -269,14 +251,18 @@ class LocalizationNode:
 	self.odom_base_link_br.sendTransform(self.odom_base_link_tf)
         self.fused_pose_pub.publish(self.fused_pose_msg)
 
+    def clean(self):
+        rospy.loginfo("Cleaning up threads.")
+        self.update_thread.join()
+
 if __name__ == '__main__':
     rospy.init_node("fy03_localization_node")
     localization_node = LocalizationNode()
-
-    rospy.loginfo ("running node")
+  
+    rospy.on_shutdown(localization_node.clean)
 
     try:
-  	rospy.spin() 
+        rospy.spin() 
     except rospy.ROSInterruptException:
         pass
 
