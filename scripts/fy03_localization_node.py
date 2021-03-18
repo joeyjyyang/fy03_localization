@@ -24,8 +24,8 @@ class LocalizationNode:
 	self.num_particles = 10000
     	self.x_range = (0, 2.85) # Size of 
     	self.y_range = (0, 5.5)
-        self.distance_std_dev = 1.0 #tuneable variable
-        self.UWB_covariance = 0.1 #tuneable variable
+        self.distance_std_dev = 5.0 #1.0 #tuneable variable
+        self.UWB_covariance = 1.0 #0.1 #tuneable variable
 
         # Constants
 	self.x_vals = [0] * self.num_particles # Initialize x coords of particles
@@ -41,7 +41,8 @@ class LocalizationNode:
 	self.linear_velocity_y = 0 # IMU dead-reckoning linear velocity y value
 
         # Zero Velocity Detector
-        self.vel_tolerance = 0.3 #tuneable variable
+        self.vel_tolerance = 0.3 #tuneable variable (m/s)
+        self.zero_vel_offset = 0.3 #tuneable variable (m)
         self.zero_vel_matrix = [] # Stores previous tag positions in instances of zero velocity
         self.zero_vel_sensitivity_parameter = 5 #tuneable variable 
 
@@ -57,9 +58,9 @@ class LocalizationNode:
     	self.initializeParticles()
         
         # Start thread.
-        update_thread = threading.Thread(target = self.runUpdate)
-        update_thread.daemon = True
-        update_thread.start()
+        self.update_thread = threading.Thread(target = self.runUpdate)
+        self.update_thread.daemon = True
+        self.update_thread.start()
 
     def imuCallback(self, imu_msg):
         # Populate orientation data (not estimated through particle filter)
@@ -78,12 +79,15 @@ class LocalizationNode:
         linear_acceleration_x = imu_msg.linear_acceleration.x
         linear_acceleration_y = imu_msg.linear_acceleration.y
         u = [linear_acceleration_x, linear_acceleration_y]
-        #self.predict(u)
+        
+        self.predict(u)
 	
     def tagCallback(self, tag_msg):
         self.x_tag = tag_msg.pose.position.x
         self.y_tag = tag_msg.pose.position.y
         # quality_factor = tag_msg.quality_factor	
+    
+        #self.update()
 
     # Prediction step.
     # Get motion data (control inputs) from IMU and move particles.
@@ -118,8 +122,6 @@ class LocalizationNode:
     # Update step.
     # Get observation of position from UWB and update weights of particles.
     def update(self):
-        rospy.loginfo("threading..")
-
 	distance = 0
 	temp_weight = 0
 
@@ -149,10 +151,10 @@ class LocalizationNode:
         for previous_tag_pose in self.zero_vel_matrix:
 	    # If last read (current) UWB tag position is NOT within range of all previous UWB tag positions,
 	    # then it is NOT an instance of zero velocity.
-            if not ((previous_tag_pose[0] - self.UWB_covariance < self.x_tag) &
-               (previous_tag_pose[0] + self.UWB_covariance > self.x_tag) &
-               (previous_tag_pose[1] - self.UWB_covariance < self.y_tag) &
-               (previous_tag_pose[1] + self.UWB_covariance > self.y_tag)):
+            if not ((previous_tag_pose[0] - self.zero_vel_offset < self.x_tag) &
+               (previous_tag_pose[0] + self.zero_vel_offset > self.x_tag) &
+               (previous_tag_pose[1] - self.zero_vel_offset < self.y_tag) &
+               (previous_tag_pose[1] + self.zero_vel_offset > self.y_tag)):
 		zero_vel = False
 
         # If instance of zero velocity, add current tag pose to matrix.
@@ -239,6 +241,8 @@ class LocalizationNode:
         self.fused_pose_msg.pose.pose.position.x = self.x_fused
         self.fused_pose_msg.pose.pose.position.y = self.y_fused
 
+        rospy.loginfo("x: %f, y: %f" % (self.fused_pose_msg.pose.pose.position.x, self.fused_pose_msg.pose.pose.position.y))
+
 	# Populate odom->base_link transform
         self.odom_base_link_tf.header.stamp = time_stamp
         self.odom_base_link_tf.header.frame_id = frame_id
@@ -259,7 +263,7 @@ if __name__ == '__main__':
     rospy.init_node("fy03_localization_node")
     localization_node = LocalizationNode()
   
-    rospy.on_shutdown(localization_node.clean)
+    #rospy.on_shutdown(localization_node.clean)
 
     try:
         rospy.spin() 
