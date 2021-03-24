@@ -22,10 +22,19 @@ class LocalizationNode:
 	# Particle Filter.	
         # Tuneable
 	self.num_particles = 10000
-    	self.x_range = (0, 2.85) # Size of 
-    	self.y_range = (0, 5.5)
-        self.distance_std_dev = 5.0 #1.0 #tuneable variable
-        self.UWB_covariance = 1.0 #0.1 #tuneable variable
+    	self.x_range = (0, 3.5) # (0, 2.85)
+    	self.y_range = (0, 6.5) #(0, 5.5)
+        # Used in update step
+
+        # Too high -> all particles get same weight
+        # Too low -> one particle gets all the weight
+        # Extremely sensitive
+        self.distance_std_dev = 0.3 #0.2 to 0.5 (ideally)
+
+        # Too high -> steady state error too high on average
+        # Too low -> will not converge quickly
+        # Used in resample step
+        self.UWB_covariance = 2.0 #5.0
 
         # Constants
 	self.x_vals = [0] * self.num_particles # Initialize x coords of particles
@@ -41,10 +50,10 @@ class LocalizationNode:
 	self.linear_velocity_y = 0 # IMU dead-reckoning linear velocity y value
 
         # Zero Velocity Detector
-        self.vel_tolerance = 0.3 #tuneable variable (m/s)
+        self.vel_tolerance = 0.1 #tuneable variable (m/s)
         self.zero_vel_offset = 0.3 #tuneable variable (m)
         self.zero_vel_matrix = [] # Stores previous tag positions in instances of zero velocity
-        self.zero_vel_sensitivity_parameter = 5 #tuneable variable 
+        self.zero_vel_sensitivity_parameter = 3 #tuneable variable 
 
 	# ROS
         self.imu_sub = rospy.Subscriber("/imu/data", Imu, self.imuCallback, queue_size = 1)
@@ -100,13 +109,13 @@ class LocalizationNode:
     	self.linear_velocity_x = self.linear_velocity_x + (linear_acceleration_x * dt)
     	self.linear_velocity_y = self.linear_velocity_y + (linear_acceleration_y * dt)
 	
-        linear_velocity_magnitude = sqrt((self.linear_velocity_x**2) + (self.linear_velocity_y**2))
+        #linear_velocity_magnitude = sqrt((self.linear_velocity_x**2) + (self.linear_velocity_y**2))
         
         # If velocity is under the tolerance, check for zero velocity!
-        if linear_velocity_magnitude < self.vel_tolerance:
-    	    if self.zeroVelocityCheck():
-	    	self.linear_velocity_x = 0
-	        self.linear_velocity_y = 0   
+        #if linear_velocity_magnitude < self.vel_tolerance:
+    	if self.zeroVelocityCheck():
+	    self.linear_velocity_x = 0
+	    self.linear_velocity_y = 0   
  	
     	linear_displacement_x = self.linear_velocity_x * dt
     	linear_displacement_y = self.linear_velocity_y * dt

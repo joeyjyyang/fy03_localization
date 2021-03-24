@@ -1,5 +1,5 @@
 <launch>
  <node name="fy03_localization_node" pkg="fy03_localization" type="fy03_localization_node.py" output="screen"/>
 
- <node pkg="rosbag" type="play" name="player" output="screen" args="--clock /home/joey/capstone_ws/src/move.bag"/> 
+ <node pkg="rosbag" type="play" name="player" output="screen" args="--clock /home/joey/capstone_ws/bags/wednesday/circle1.bag"/> 
 </launch>
