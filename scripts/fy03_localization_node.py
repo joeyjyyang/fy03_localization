@@ -21,8 +21,12 @@ class LocalizationNode:
     def __init__(self):
 	# Particle Filter.	
         # Tuneable
-	self.num_particles = 10000
-    	self.x_range = (0, 3.5) # (0, 2.85)
+	self.num_particles = 5000
+	self.IMU_messages_per_move = 10 
+	#This parameter relates to self.linear_displacement_counter
+	#This defines the number of IMU steps stored before moving all points
+    	
+	self.x_range = (0, 3.5) # (0, 2.85)
     	self.y_range = (0, 6.5) #(0, 5.5)
         # Used in update step
 
@@ -34,7 +38,7 @@ class LocalizationNode:
         # Too high -> steady state error too high on average
         # Too low -> will not converge quickly
         # Used in resample step
-        self.UWB_covariance = 2.0 #5.0
+        self.UWB_covariance = 1.5 #5.0
 
         # Constants
 	self.x_vals = [0] * self.num_particles # Initialize x coords of particles
@@ -44,16 +48,24 @@ class LocalizationNode:
     	self.normalized_weights = [0] * self.num_particles # Initialize normalized weights of particles
 	self.x_tag = 0 # Tag x coord from UWB
 	self.y_tag = 0 # Tag y coord from UWB
+	self.x_tag_prev = 0 # Remembers previous x_coord
+	self.y_tag_prev = 0 # Remembers previous y_coord
 	self.x_fused = 0 # Fusion x coord from PF
 	self.y_fused = 0 # Fusion y coord from PF
 	self.linear_velocity_x = 0 # IMU dead-reckoning linear velocity x value
 	self.linear_velocity_y = 0 # IMU dead-reckoning linear velocity y value
+	self.linear_displacement_x = 0 # Saves displacement over short periods of time
+	self.linear_displacement_y = 0 # Saves displacement over short periods of time
+	self.linear_displacement_counter = 0 #IMU dead-reckoning accumulation counter
 
         # Zero Velocity Detector
         self.vel_tolerance = 0.1 #tuneable variable (m/s)
         self.zero_vel_offset = 0.3 #tuneable variable (m)
         self.zero_vel_matrix = [] # Stores previous tag positions in instances of zero velocity
         self.zero_vel_sensitivity_parameter = 3 #tuneable variable 
+
+	# High Velocity Detector
+	self.high_velocity_multiplier = 2 # By what factor can valocity be over before we reset it?
 
 	# ROS
         self.imu_sub = rospy.Subscriber("/imu/data", Imu, self.imuCallback, queue_size = 1)
@@ -101,8 +113,8 @@ class LocalizationNode:
     # Prediction step.
     # Get motion data (control inputs) from IMU and move particles.
     #
-    # Also performs zero velocity check if linear velocity readings.
-    def predict(self, u, dt = 0.01): #std: float):
+    # Also performs zero velocity check if linear velocity readings.	self.linear_displacement_counter = self.linear_displacement_counter +1
+    def predict(self, u, dt = 0.01):
     	linear_acceleration_x = u[0]
 	linear_acceleration_y = u[1]
     
@@ -117,12 +129,17 @@ class LocalizationNode:
 	    self.linear_velocity_x = 0
 	    self.linear_velocity_y = 0   
  	
-    	linear_displacement_x = self.linear_velocity_x * dt
-    	linear_displacement_y = self.linear_velocity_y * dt
+    	self.linear_displacement_x = self.linear_displacement_x + self.linear_velocity_x * dt
+    	self.linear_displacement_y = self.linear_displacement_y + self.linear_velocity_y * dt
 
-    	for i in range(self.num_particles):
-	    self.x_vals[i] += linear_displacement_x
-	    self.y_vals[i] += linear_displacement_y
+	if(1):
+	    	for i in range(self.num_particles):
+		    	self.x_vals[i] += self.linear_displacement_x
+		    	self.y_vals[i] += self.linear_displacement_y
+			self.linear_displacement_x = 0
+			self.linear_displacement_y = 0
+			self.linear_displacement_counter = 0
+
 
     def runUpdate(self):
         while True:
@@ -131,6 +148,7 @@ class LocalizationNode:
     # Update step.
     # Get observation of position from UWB and update weights of particles.
     def update(self):
+	self.highVelocityCheck()
 	distance = 0
 	temp_weight = 0
 
@@ -143,6 +161,8 @@ class LocalizationNode:
 	    self.weights[i] += 0.00000001
 
 	self.normalizeWeights()
+	self.x_tag_prev = self.x_tag # These will be used next iteration by highVelocityCheck()
+	self.y_tag_prev = self.y_tag 
 
     # Initial generation of particle based on uniform distribution.
     def initializeParticles(self):
@@ -177,7 +197,17 @@ class LocalizationNode:
             zero_vel_confirm = False
         
         return zero_vel_confirm
-    
+
+    def highVelocityCheck(self):
+	velocity_x = self.x_tag-self.x_tag_prev
+	velocity_y = self.y_tag-self.y_tag_prev
+
+	if(velocity_x > self.high_velocity_multiplier*self.linear_velocity_x):
+		self.linear_velocity_x = velocity_x
+	if(velocity_y > self.high_velocity_multiplier*self.linear_velocity_y):
+		self.linear_velocity_y = velocity_y
+		
+
     # Normalize weights.
     def normalizeWeights(self):
 	total_weight = 0
