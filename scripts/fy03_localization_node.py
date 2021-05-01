@@ -21,7 +21,7 @@ class LocalizationNode:
     def __init__(self):
 	# Particle Filter.	
         # Tuneable
-	self.num_particles = 5000
+	self.num_particles = 3000 #5000
 	self.IMU_messages_per_move = 10 
 	#This parameter relates to self.linear_displacement_counter
 	#This defines the number of IMU steps stored before moving all points
