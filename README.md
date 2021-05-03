@@ -45,6 +45,17 @@ rospack profile
 1. Wire IMU to Raspberry Pi over GPIO (I2C) pins
 2. Launch [BNO055 ROS driver node](https://github.com/joeyjyyang/ros_bno055) to see IMU data in ROS
 
+## Nodes
+- `fy03_localization_node`
+
+## Topics
+### Subscribed Topics
+- `/tag`
+- `/imu/data`
+
+### Published Topics
+- `/fused_pose`
+
 ## Usage
 ### Example
 ```
