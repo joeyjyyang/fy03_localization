@@ -19,33 +19,9 @@ import threading
 class LocalizationNode:
     
     def __init__(self):
-	# Particle Filter.	
-        # Tuneable
-	self.num_particles = 3000 #5000
-	self.IMU_messages_per_move = 10 
-	#This parameter relates to self.linear_displacement_counter
-	#This defines the number of IMU steps stored before moving all points
-    	
-	self.x_range = (0, 3.5) # (0, 2.85)
-    	self.y_range = (0, 6.5) #(0, 5.5)
-        # Used in update step
-
-        # Too high -> all particles get same weight
-        # Too low -> one particle gets all the weight
-        # Extremely sensitive
-        self.distance_std_dev = 0.3 #0.2 to 0.5 (ideally)
-
-        # Too high -> steady state error too high on average
-        # Too low -> will not converge quickly
-        # Used in resample step
-        self.UWB_covariance = 1.5 #5.0
 
         # Constants
-	self.x_vals = [0] * self.num_particles # Initialize x coords of particles
-    	self.y_vals = [0] * self.num_particles # Initialize y coords of particles
-    	self.weights = [0] * self.num_particles # Initialize weights of particles
-    	self.current_estimate = ()
-    	self.normalized_weights = [0] * self.num_particles # Initialize normalized weights of particles
+
 	self.x_tag = 0 # Tag x coord from UWB
 	self.y_tag = 0 # Tag y coord from UWB
 	self.x_tag_prev = 0 # Remembers previous x_coord
@@ -54,18 +30,8 @@ class LocalizationNode:
 	self.y_fused = 0 # Fusion y coord from PF
 	self.linear_velocity_x = 0 # IMU dead-reckoning linear velocity x value
 	self.linear_velocity_y = 0 # IMU dead-reckoning linear velocity y value
-	self.linear_displacement_x = 0 # Saves displacement over short periods of time
-	self.linear_displacement_y = 0 # Saves displacement over short periods of time
-	self.linear_displacement_counter = 0 #IMU dead-reckoning accumulation counter
-
-        # Zero Velocity Detector
-        self.vel_tolerance = 0.1 #tuneable variable (m/s)
-        self.zero_vel_offset = 0.3 #tuneable variable (m)
-        self.zero_vel_matrix = [] # Stores previous tag positions in instances of zero velocity
-        self.zero_vel_sensitivity_parameter = 3 #tuneable variable 
-
-	# High Velocity Detector
-	self.high_velocity_multiplier = 2 # By what factor can valocity be over before we reset it?
+	self.linear_velocity_x_matrix = [0] # Tracks up to 10 most recent velocity vals
+	self.linear_velocity_y_matrix = [0] # Tracks up to 10 most recent velocity vals
 
 	# ROS
         self.imu_sub = rospy.Subscriber("/imu/data", Imu, self.imuCallback, queue_size = 1)
@@ -74,14 +40,6 @@ class LocalizationNode:
 	self.fused_pose_msg = Odometry()
        	self.odom_base_link_br = tf2_ros.TransformBroadcaster()
         self.odom_base_link_tf = TransformStamped()
-
-	# Create initial particles.
-    	self.initializeParticles()
-        
-        # Start thread.
-        self.update_thread = threading.Thread(target = self.runUpdate)
-        self.update_thread.daemon = True
-        self.update_thread.start()
 
     def imuCallback(self, imu_msg):
         # Populate orientation data (not estimated through particle filter)
@@ -101,171 +59,83 @@ class LocalizationNode:
         linear_acceleration_y = imu_msg.linear_acceleration.y
         u = [linear_acceleration_x, linear_acceleration_y]
         
-        self.predict(u)
+	self.IMU_data(u)
 	
     def tagCallback(self, tag_msg):
         self.x_tag = tag_msg.pose.position.x
         self.y_tag = tag_msg.pose.position.y
-        # quality_factor = tag_msg.quality_factor	
-    
-        #self.update()
+
+	self.UWB_data()
+
 
     # Prediction step.
-    # Get motion data (control inputs) from IMU and move particles.
-    #
-    # Also performs zero velocity check if linear velocity readings.	self.linear_displacement_counter = self.linear_displacement_counter +1
-    def predict(self, u, dt = 0.01):
-    	linear_acceleration_x = u[0]
-	linear_acceleration_y = u[1]
-    
-    	self.linear_velocity_x = self.linear_velocity_x + (linear_acceleration_x * dt)
-    	self.linear_velocity_y = self.linear_velocity_y + (linear_acceleration_y * dt)
-	
-        #linear_velocity_magnitude = sqrt((self.linear_velocity_x**2) + (self.linear_velocity_y**2))
-        
-        # If velocity is under the tolerance, check for zero velocity!
-        #if linear_velocity_magnitude < self.vel_tolerance:
-    	if self.zeroVelocityCheck():
-	    self.linear_velocity_x = 0
-	    self.linear_velocity_y = 0   
- 	
-    	self.linear_displacement_x = self.linear_displacement_x + self.linear_velocity_x * dt
-    	self.linear_displacement_y = self.linear_displacement_y + self.linear_velocity_y * dt
 
-	if(1):
-	    	for i in range(self.num_particles):
-		    	self.x_vals[i] += self.linear_displacement_x
-		    	self.y_vals[i] += self.linear_displacement_y
-			self.linear_displacement_x = 0
-			self.linear_displacement_y = 0
-			self.linear_displacement_counter = 0
+	#The IMU runs 100 times per second
+	#The UWB runs 10 times per second
+	#The IMU runs 10 times per UWB data point
 
 
-    def runUpdate(self):
-        while True:
-            self.update()
+
+    def IMU_data(self, u, dt = 0.01):						##consider replacing dt with an actual time step from the system clock
+	length = len(self.linear_velocity_x_matrix)
+	#current velocity = previous velocity + (acceleration * time step)
+	self.linear_velocity_x = self.linear_velocity_x_matrix[length-1] + u[0]*dt
+	self.linear_velocity_y = self.linear_velocity_y_matrix[length-1] + u[1]*dt
+	#add curent velocity to list of velocities
+	self.linear_velocity_x_matrix.append(self.linear_velocity_x)
+	self.linear_velocity_y_matrix.append(self.linear_velocity_y)
 
     # Update step.
     # Get observation of position from UWB and update weights of particles.
-    def update(self):
-	self.highVelocityCheck()
-	distance = 0
-	temp_weight = 0
 
-	for i in range(self.num_particles):
-	    distance = self.p2pDistance(self.x_vals[i], self.y_vals[i])
-	    temp_weight = (scipy.stats.norm.pdf(distance, 0, self.distance_std_dev))
-	    if temp_weight == 1:
-		temp_weight = 0
-            self.weights[i] = temp_weight
-	    self.weights[i] += 0.00000001
-
-	self.normalizeWeights()
-	self.x_tag_prev = self.x_tag # These will be used next iteration by highVelocityCheck()
-	self.y_tag_prev = self.y_tag 
-
-    # Initial generation of particle based on uniform distribution.
-    def initializeParticles(self):
-	for i in range(self.num_particles):
-            self.x_vals[i] = uniform(self.x_range[0], self.x_range[1])
-            self.y_vals[i] = uniform(self.y_range[0], self.y_range[1])
-
-    # Triggerd by potentially low velocity reading from IMU.
-    # Verifies the current instance as an instance of truly zero velocity.
-    def zeroVelocityCheck(self):
-        zero_vel = True
-	zero_vel_confirm = True
-
-        # Compare last read (current) UWB tag position with previous UWB tag positions
-        for previous_tag_pose in self.zero_vel_matrix:
-	    # If last read (current) UWB tag position is NOT within range of all previous UWB tag positions,
-	    # then it is NOT an instance of zero velocity.
-            if not ((previous_tag_pose[0] - self.zero_vel_offset < self.x_tag) &
-               (previous_tag_pose[0] + self.zero_vel_offset > self.x_tag) &
-               (previous_tag_pose[1] - self.zero_vel_offset < self.y_tag) &
-               (previous_tag_pose[1] + self.zero_vel_offset > self.y_tag)):
-		zero_vel = False
-
-        # If instance of zero velocity, add current tag pose to matrix.
-        if zero_vel:
-            self.zero_vel_matrix.append([self.x_tag, self.y_tag])
-	else:
-	    self.zero_vel_matrix = []
-
-        # If number of zero velocity instances exceed threshold, notify zero velocity.
-        if len(self.zero_vel_matrix) < self.zero_vel_sensitivity_parameter:
-            zero_vel_confirm = False
-        
-        return zero_vel_confirm
-
-    def highVelocityCheck(self):
-	velocity_x = self.x_tag-self.x_tag_prev
-	velocity_y = self.y_tag-self.y_tag_prev
-
-	if(velocity_x > self.high_velocity_multiplier*self.linear_velocity_x):
-		self.linear_velocity_x = velocity_x
-	if(velocity_y > self.high_velocity_multiplier*self.linear_velocity_y):
-		self.linear_velocity_y = velocity_y
-		
-
-    # Normalize weights.
-    def normalizeWeights(self):
-	total_weight = 0
 	
-	for weight in self.weights:
-	    total_weight += weight
 	
-	for i in range(self.num_particles):
-	    self.normalized_weights[i] = self.weights[i] / total_weight    
+	#happens 10 times per second
+	#after 10 IMU data points
 
-	self.getFusedPose()
-
-    # Calculates the distance between 2 points.
-    # Specifically, the distance between each particle,
-    # and the UWB measurement of position.
-    def p2pDistance(self, x_particle, y_particle):
-	x_diff = float(self.x_tag - x_particle)
-	y_diff = float(self.y_tag - y_particle)
-	distance = sqrt((x_diff**2) + (y_diff**2))
-
-	return distance
-
-    # Resample step.
-    # Regenerate particles with no weights.
-    def resample(self):
-	cum_sum = 0
-	counter = 0
-	prev_x_vals = self.x_vals
-	prev_y_vals = self.y_vals
-	self.x_vals = [0] * self.num_particles
-	self.y_vals = [0] * self.num_particles
-	self.weights = [0] * self.num_particles
+    def UWB_data(self, dt = 0.1):						##consider replacing dt with an actual time step from the system clock
+	#current velocity = dx/dt
+	UWB_vel_x = (self.x_tag-self.x_tag_prev)/dt
+	UWB_vel_y = (self.y_tag-self.y_tag_prev)/dt
 	
-        #rospy.loginfo(self.x_vals)
 
-	for i in range(self.num_particles):
-	    cum_sum += self.normalized_weights[i] * float(self.num_particles)
-	    
-	    while (counter < cum_sum):
-		self.x_vals[i] = random.normal(prev_x_vals[i], self.UWB_covariance)
-		self.y_vals[i] = random.normal(prev_y_vals[i], self.UWB_covariance)
-		counter += 1
+	print("IMU_vel x,y: " + str(self.linear_velocity_x) + ", " + str(self.linear_velocity_y) + " UWB_vel x,y: " + str(UWB_vel_x) + ", " + str(UWB_vel_y) + "\n")
+				
+				##add self correction step where last n (prob 50-100) UWB time steps are compared with IMU velocity to determine IMU velocity factor in real time
 
-	for i in range(self.num_particles):
-	    self.weights[i] = 1
 
-    # Determine best approximation based on weighted particles.
-    def getFusedPose(self):
-	self.x_fused = 0
-	self.y_fused = 0
 
-	for i in range(self.num_particles):
-	    self.x_fused += self.x_vals[i] * self.normalized_weights[i]
-	    self.y_fused += self.y_vals[i] * self.normalized_weights[i]
-        
+	self.linear_velocity_x = (self.linear_velocity_x+UWB_vel_x)/2		##could replace with sophisticated EKF step
+	self.linear_velocity_y = (self.linear_velocity_y+UWB_vel_y)/2		##alternatively could use tuning parameters to weigh the average (e.g 0.7x+0.3y)	
+
+	#length = len(self.linear_velocity_x_matrix)
+	#x_vel_ave = 0
+	#y_vel_ave = 0
+	#for i in range(length):
+	#	x_vel_ave = x_vel_ave + self.linear_velocity_x_matrix[i]   	##v1 * t1 + v2 * t2 + v3 * t3 = x
+	#	y_vel_ave = y_vel_ave + self.linear_velocity_y_matrix[i]	##t1 = t2 = t3 = t
+										##(v1 + v2 + v3)t = x
+										
+	
+	#x_vel_ave = x_vel_ave/length
+	#y_vel_ave = y_vel_ave/length
+
+	self.x_fused = 0.9*self.x_tag + 0.1*(self.x_tag_prev + self.linear_velocity_x*dt)	##could replace with sophisticated EKF step
+	self.y_fused = 0.9*self.y_tag + 0.1*(self.y_tag_prev + self.linear_velocity_y*dt)
+
+	#print("x: " + str(self.x_fused) + "y: " + str(self.y_fused))
+
+	self.linear_velocity_x_matrix = [self.linear_velocity_x]
+	self.linear_velocity_y_matrix = [self.linear_velocity_y]
+
+	self.x_tag_prev = self.x_tag
+	self.y_tag_prev = self.y_tag
+
 	self.publishFusedPose()
-	self.resample()
-	
+
+
+				##add axis allignment step every 15-30 seconds, use x,y accel/vel from IMU and UWB displacement to allign.
+
     # Publish best approximation to ROS.    
     def publishFusedPose(self):
 	time_stamp = rospy.get_rostime()
@@ -293,10 +163,6 @@ class LocalizationNode:
         # Publish and broadcast  
 	self.odom_base_link_br.sendTransform(self.odom_base_link_tf)
         self.fused_pose_pub.publish(self.fused_pose_msg)
-
-    def clean(self):
-        rospy.loginfo("Cleaning up threads.")
-        self.update_thread.join()
 
 if __name__ == '__main__':
     rospy.init_node("fy03_localization_node")
