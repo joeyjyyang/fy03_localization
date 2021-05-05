@@ -2,7 +2,6 @@
 
 import rospy
 import tf2_ros
-from ros_dwm1001.msg import Tag, Anchor
 from sensor_msgs.msg import Imu
 from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker
