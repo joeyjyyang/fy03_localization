@@ -4,7 +4,6 @@ project(fy03_localization)
 find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
-  message_generation
   sensor_msgs
   nav_msgs
   tf2_ros
@@ -14,15 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 catkin_python_setup()
 
-generate_messages(
-  DEPENDENCIES
-  std_msgs
-  sensor_msgs
-  nav_msgs
-  visualization_msgs
-)
-
 catkin_package(
-  CATKIN_DEPENDS rospy std_msgs message_runtime sensor_msgs nav_msgs tf2_ros visualization_msgs geometry_msgs
+  CATKIN_DEPENDS rospy std_msgs sensor_msgs nav_msgs tf2_ros visualization_msgs geometry_msgs
 )
 
