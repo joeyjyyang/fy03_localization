@@ -20,9 +20,8 @@ class LocalizationNode:
     def __init__(self):
 
         # Constants
-
-	self.x_tag = 0 # Tag x coord from UWB
-	self.y_tag = 0 # Tag y coord from UWB
+		self.x_tag = 0 # Tag x coord from UWB
+		self.y_tag = 0 # Tag y coord from UWB
 	self.x_tag_prev = 0 # Remembers previous x_coord
 	self.y_tag_prev = 0 # Remembers previous y_coord
 	self.x_fused = 0 # Fusion x coord from PF
@@ -31,6 +30,8 @@ class LocalizationNode:
 	self.linear_velocity_y = 0 # IMU dead-reckoning linear velocity y value
 	self.linear_velocity_x_matrix = [0] # Tracks up to 10 most recent velocity vals
 	self.linear_velocity_y_matrix = [0] # Tracks up to 10 most recent velocity vals
+	self.coordinate_angle_offset = 0 # Tracks up the offset angle to covert UWB coordinates to IMU ones
+
 
 	# ROS
         self.imu_sub = rospy.Subscriber("/imu/data", Imu, self.imuCallback, queue_size = 1)
@@ -87,7 +88,17 @@ class LocalizationNode:
     # Update step.
     # Get observation of position from UWB and update weights of particles.
 
-	
+	#Calculate the offset angle for axis alignment
+    def calc_offset_angle(self, UWBx, UWBy, IMUx, IMUy):	
+	theta1 = atan2(IMUy, IMUx)		
+	theta2 = atan2(UWBy, UWBx)
+	self.coordinate_angle_offset = theta1 - theta2
+
+    def UWB2IMU(self, UWBx, UWBy):
+	magnitude = sqrt(UWBx*UWBx + UWBy*UWBy)
+	theta = atan2(UWBy, UWBx)
+	new_theta = theta + self.coordinate_angle_offset
+	return cos(new_theta)*magnitude, sin(new_theta)*magnitude
 	
 	#happens 10 times per second
 	#after 10 IMU data points
@@ -104,6 +115,7 @@ class LocalizationNode:
 
 
 
+	UWB_vel_x, UWB_vel_y = self.UWB2IMU(UWB_vel_x, UWB_vel_y) 
 	self.linear_velocity_x = (self.linear_velocity_x+UWB_vel_x)/2		##could replace with sophisticated EKF step
 	self.linear_velocity_y = (self.linear_velocity_y+UWB_vel_y)/2		##alternatively could use tuning parameters to weigh the average (e.g 0.7x+0.3y)	
 
