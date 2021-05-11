@@ -31,7 +31,15 @@ class LocalizationNode:
 		self.linear_velocity_x_matrix = [0] # Tracks up to 10 most recent velocity vals
 		self.linear_velocity_y_matrix = [0] # Tracks up to 10 most recent velocity vals
 		self.coordinate_angle_offset = 0 # Tracks up the offset angle to covert UWB coordinates to IMU ones
-		
+		self.UWB_error = 0.0011 # The variance of this kind of sensor, 3*sigma = 10 cm
+		self.IMU_error = 0.00013 # The variance of this kind of sensor, calculated from 4% max error = 3*sigma
+		self.IMU_uncertainty_x = 0 
+		self.IMU_uncertainty_y = 0 
+		self.IMU_uncertainty_x_matrix = [0] # Tracks up to 10 most recent velocity variances
+		self.IMU_uncertainty_y_matrix = [0] # Tracks up to 10 most recent velocity variances
+		self.UWB_uncertainty = self.UWB_error * 100 * 2 # UWB velocity variance is a constant
+		self.alignment = 0 # The value controlling the frequeny of recalculating offset angle in axis alignment
+
 		# ROS
 		self.imu_sub = rospy.Subscriber("/imu/data", Imu, self.imuCallback, queue_size = 1)
 		self.uwb_tag_sub = rospy.Subscriber("/tag", Marker, self.tagCallback, queue_size = 1)
@@ -57,13 +65,16 @@ class LocalizationNode:
 		linear_acceleration_x = imu_msg.linear_acceleration.x
 		linear_acceleration_y = imu_msg.linear_acceleration.y
 		u = [linear_acceleration_x, linear_acceleration_y]
+		# Fault injection
+		# theta = atan2(u[1], u[0])
+		# magnitude = sqrt(u[0]*u[0] + u[1]*u[1])
+		# u = [cos(theta-3)*magnitude, sin(theta-3)*magnitude]
 		self.IMU_data(u)
 	
 	def tagCallback(self, tag_msg):
 		self.x_tag = tag_msg.pose.position.x
 		self.y_tag = tag_msg.pose.position.y
 		self.UWB_data()
-
 
 	# Prediction step.
 
@@ -78,6 +89,15 @@ class LocalizationNode:
 		#current velocity = previous velocity + (acceleration * time step)
 		self.linear_velocity_x = self.linear_velocity_x_matrix[length-1] + u[0]*dt
 		self.linear_velocity_y = self.linear_velocity_y_matrix[length-1] + u[1]*dt
+
+		#Variance calculation
+		self.IMU_uncertainty_x += dt*dt*(self.IMU_error*(u[0]**2))
+		self.IMU_uncertainty_y += dt*dt*(self.IMU_error*(u[1]**2))
+
+		#add current variance to list for kalman filter calculation
+		self.IMU_uncertainty_x_matrix.append(self.IMU_uncertainty_x)
+		self.IMU_uncertainty_y_matrix.append(self.IMU_uncertainty_y)
+
 		#add curent velocity to list of velocities
 		self.linear_velocity_x_matrix.append(self.linear_velocity_x)
 		self.linear_velocity_y_matrix.append(self.linear_velocity_y)
@@ -97,22 +117,50 @@ class LocalizationNode:
 		new_theta = theta + self.coordinate_angle_offset
 		return cos(new_theta)*magnitude, sin(new_theta)*magnitude
 	
+	# 1D Kalman filter that use 10 IMU values to achieve better estimation UWB value
+	def kalman_filter(self, UWBx, matrix, uncertainty):
+		x = UWBx
+		p = self.UWB_uncertainty
+		i = 0
+		for z in matrix:
+			K = p/(p + uncertainty[i])
+			x = x + K * (z - x)
+			p = (1-K) * p 
+			i += 1
+		return x, p
+
 	#happens 10 times per second
 	#after 10 IMU data points
 
 	def UWB_data(self, dt = 0.1):						##consider replacing dt with an actual time step from the system clock
 		#current velocity = dx/dt
+		#Assume the speed is a constant over 0.1s 
 		UWB_vel_x = (self.x_tag-self.x_tag_prev)/dt
 		UWB_vel_y = (self.y_tag-self.y_tag_prev)/dt
-	
+		# Fault injection
+		# alpha = atan2(UWB_vel_y, UWB_vel_x) + 1.2
+		# m = sqrt(UWB_vel_x*UWB_vel_x + UWB_vel_y*UWB_vel_y)
+		# UWB_vel_x = cos(alpha)*m 
+		# UWB_vel_y = sin(alpha)*m
+
+		#Axis alignment every 20 second
+		if (self.alignment == 200):
+			self.alignment = 0
+			self.calc_offset_angle(UWB_vel_x, UWB_vel_y, self.linear_velocity_x, self.linear_velocity_y)
+		self.alignment += 1
 
 		print("IMU_vel x,y: " + str(self.linear_velocity_x) + ", " + str(self.linear_velocity_y) + " UWB_vel x,y: " + str(UWB_vel_x) + ", " + str(UWB_vel_y) + "\n")
 				
-			##add self correction step where last n (prob 50-100) UWB time steps are compared with IMU velocity to determine IMU velocity factor in real time
+		##add self correction step where last n (prob 50-100) UWB time steps are compared with IMU velocity to determine IMU velocity factor in real time
 
 
 
 		UWB_vel_x, UWB_vel_y = self.UWB2IMU(UWB_vel_x, UWB_vel_y) 
+		# Use Kalman filter
+		# self.linear_velocity_x, self.IMU_uncertainty_x = self.kalman_filter(UWB_vel_x, self.linear_velocity_x_matrix, self.IMU_uncertainty_x_matrix)
+		# self.linear_velocity_y, self.IMU_uncertainty_y = self.kalman_filter(UWB_vel_y, self.linear_velocity_y_matrix, self.IMU_uncertainty_y_matrix)
+		
+		#Take Average 
 		self.linear_velocity_x = (self.linear_velocity_x+UWB_vel_x)/2		##could replace with sophisticated EKF step
 		self.linear_velocity_y = (self.linear_velocity_y+UWB_vel_y)/2		##alternatively could use tuning parameters to weigh the average (e.g 0.7x+0.3y)	
 
@@ -128,13 +176,24 @@ class LocalizationNode:
 		#x_vel_ave = x_vel_ave/length
 		#y_vel_ave = y_vel_ave/length
 
-		self.x_fused = 0.9*self.x_tag + 0.1*(self.x_tag_prev + self.linear_velocity_x*dt)	##could replace with sophisticated EKF step
-		self.y_fused = 0.9*self.y_tag + 0.1*(self.y_tag_prev + self.linear_velocity_y*dt)
+		# Use kalman filter 
+		# estimate_variance_x = self.UWB_uncertainty + dt*dt * self.IMU_uncertainty_x
+		# estimate_variance_y = self.UWB_uncertainty + dt*dt * self.IMU_uncertainty_y
+		# K_x = estimate_variance_x / (estimate_variance_x + self.UWB_uncertainty)
+		# K_y = estimate_variance_y / (estimate_variance_y + self.UWB_uncertainty)
+		# self.x_fused = self.x_tag_prev + self.linear_velocity_x*dt + K_x * (self.x_tag - self.x_tag_prev - self.linear_velocity_x*dt)
+		# self.y_fused = self.y_tag_prev + self.linear_velocity_y*dt + K_y * (self.y_tag - self.y_tag_prev - self.linear_velocity_y*dt)
+
+		# Take arbitary numbers
+		self.x_fused = 0.5*self.x_tag + 0.5*(self.x_tag_prev + self.linear_velocity_x*dt)	##could replace with sophisticated EKF step
+		self.y_fused = 0.5*self.y_tag + 0.5*(self.y_tag_prev + self.linear_velocity_y*dt)
 
 		#print("x: " + str(self.x_fused) + "y: " + str(self.y_fused))
 
 		self.linear_velocity_x_matrix = [self.linear_velocity_x]
 		self.linear_velocity_y_matrix = [self.linear_velocity_y]
+		self.IMU_uncertainty_x_matrix = [self.IMU_uncertainty_x]
+		self.IMU_uncertainty_y_matrix = [self.IMU_uncertainty_y]
 
 		self.x_tag_prev = self.x_tag
 		self.y_tag_prev = self.y_tag
