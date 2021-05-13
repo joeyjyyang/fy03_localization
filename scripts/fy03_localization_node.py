@@ -31,14 +31,15 @@ class LocalizationNode:
 		self.linear_velocity_x_matrix = [0] # Tracks up to 10 most recent velocity vals
 		self.linear_velocity_y_matrix = [0] # Tracks up to 10 most recent velocity vals
 		self.coordinate_angle_offset = 0 # Tracks up the offset angle to covert UWB coordinates to IMU ones
-		self.UWB_error = 0.0011 # The variance of this kind of sensor, 3*sigma = 10 cm
-		self.IMU_error = 0.00013 # The variance of this kind of sensor, calculated from 4% max error = 3*sigma
+		self.UWB_error = (0.1/3)**2 # The variance of this kind of sensor, 3*sigma = 10 cm
+		self.IMU_error = (0.04/3)**2 # The variance of this kind of sensor, calculated from 4% max error = 3*sigma
 		self.IMU_uncertainty_x = 0 
 		self.IMU_uncertainty_y = 0 
 		self.IMU_uncertainty_x_matrix = [0] # Tracks up to 10 most recent velocity variances
 		self.IMU_uncertainty_y_matrix = [0] # Tracks up to 10 most recent velocity variances
 		self.UWB_uncertainty = self.UWB_error * 100 * 2 # UWB velocity variance is a constant
 		self.alignment = 0 # The value controlling the frequeny of recalculating offset angle in axis alignment
+		self.accum = []
 
 		# ROS
 		self.imu_sub = rospy.Subscriber("/imu/data", Imu, self.imuCallback, queue_size = 1)
@@ -69,6 +70,15 @@ class LocalizationNode:
 		# theta = atan2(u[1], u[0])
 		# magnitude = sqrt(u[0]*u[0] + u[1]*u[1])
 		# u = [cos(theta-3)*magnitude, sin(theta-3)*magnitude]
+		# if len(self.accum) < 500:
+		# 	self.accum.append(u[0])
+		# elif len(self.accum) == 500:
+		# 	d = std(self.accum)
+		# 	m = mean(self.accum)
+		# 	if u[0] < m - 3*d or u[0] > m + 3*d:
+		# 		print("WARNING WARNING WARNING")
+		# 	self.accum.pop(0)
+		# 	self.accum.append(u[0])
 		self.IMU_data(u)
 	
 	def tagCallback(self, tag_msg):
@@ -122,10 +132,15 @@ class LocalizationNode:
 		x = UWBx
 		p = self.UWB_uncertainty
 		i = 0
+		# Assume the uncertainty of nth IMU value in the list is n/matrix.length of the last IMU value,
+		# which means ignore the previous self.IMU_uncertainty 
 		for z in matrix:
-			K = p/(p + uncertainty[i])
-			x = x + K * (z - x)
-			p = (1-K) * p 
+			if p == 0:
+				K = 0
+			else: 
+				K = float(p)/(float(p) + float(uncertainty[i]))
+			x = x + float(K) * (z - x)
+			p = float(1-K) * p 
 			i += 1
 		return x, p
 
@@ -157,12 +172,13 @@ class LocalizationNode:
 
 		UWB_vel_x, UWB_vel_y = self.UWB2IMU(UWB_vel_x, UWB_vel_y) 
 		# Use Kalman filter
-		# self.linear_velocity_x, self.IMU_uncertainty_x = self.kalman_filter(UWB_vel_x, self.linear_velocity_x_matrix, self.IMU_uncertainty_x_matrix)
-		# self.linear_velocity_y, self.IMU_uncertainty_y = self.kalman_filter(UWB_vel_y, self.linear_velocity_y_matrix, self.IMU_uncertainty_y_matrix)
+		self.linear_velocity_x, self.IMU_uncertainty_x = self.kalman_filter(UWB_vel_x, self.linear_velocity_x_matrix, self.IMU_uncertainty_x_matrix)
+		self.linear_velocity_y, self.IMU_uncertainty_y = self.kalman_filter(UWB_vel_y, self.linear_velocity_y_matrix, self.IMU_uncertainty_y_matrix)
 		
+		print("THIS IS IUM UNCERTAINTY: " + str(self.IMU_uncertainty_x))
 		#Take Average 
-		self.linear_velocity_x = (self.linear_velocity_x+UWB_vel_x)/2		##could replace with sophisticated EKF step
-		self.linear_velocity_y = (self.linear_velocity_y+UWB_vel_y)/2		##alternatively could use tuning parameters to weigh the average (e.g 0.7x+0.3y)	
+		# self.linear_velocity_x = (self.linear_velocity_x+UWB_vel_x)/2		##could replace with sophisticated EKF step
+		# self.linear_velocity_y = (self.linear_velocity_y+UWB_vel_y)/2		##alternatively could use tuning parameters to weigh the average (e.g 0.7x+0.3y)	
 
 		#length = len(self.linear_velocity_x_matrix)
 		#x_vel_ave = 0
@@ -177,16 +193,16 @@ class LocalizationNode:
 		#y_vel_ave = y_vel_ave/length
 
 		# Use kalman filter 
-		# estimate_variance_x = self.UWB_uncertainty + dt*dt * self.IMU_uncertainty_x
-		# estimate_variance_y = self.UWB_uncertainty + dt*dt * self.IMU_uncertainty_y
-		# K_x = estimate_variance_x / (estimate_variance_x + self.UWB_uncertainty)
-		# K_y = estimate_variance_y / (estimate_variance_y + self.UWB_uncertainty)
-		# self.x_fused = self.x_tag_prev + self.linear_velocity_x*dt + K_x * (self.x_tag - self.x_tag_prev - self.linear_velocity_x*dt)
-		# self.y_fused = self.y_tag_prev + self.linear_velocity_y*dt + K_y * (self.y_tag - self.y_tag_prev - self.linear_velocity_y*dt)
+		estimate_variance_x = self.UWB_uncertainty + dt*dt * self.IMU_uncertainty_x
+		estimate_variance_y = self.UWB_uncertainty + dt*dt * self.IMU_uncertainty_y
+		K_x = estimate_variance_x / (estimate_variance_x + self.UWB_uncertainty)
+		K_y = estimate_variance_y / (estimate_variance_y + self.UWB_uncertainty) 
+		self.x_fused = self.x_tag_prev + self.linear_velocity_x*dt + K_x * (self.x_tag - self.x_tag_prev - self.linear_velocity_x*dt)
+		self.y_fused = self.y_tag_prev + self.linear_velocity_y*dt + K_y * (self.y_tag - self.y_tag_prev - self.linear_velocity_y*dt)
 
 		# Take arbitary numbers
-		self.x_fused = 0.5*self.x_tag + 0.5*(self.x_tag_prev + self.linear_velocity_x*dt)	##could replace with sophisticated EKF step
-		self.y_fused = 0.5*self.y_tag + 0.5*(self.y_tag_prev + self.linear_velocity_y*dt)
+		# self.x_fused = 0.5*self.x_tag + 0.5*(self.x_tag_prev + self.linear_velocity_x*dt)	##could replace with sophisticated EKF step
+		# self.y_fused = 0.5*self.y_tag + 0.5*(self.y_tag_prev + self.linear_velocity_y*dt)
 
 		#print("x: " + str(self.x_fused) + "y: " + str(self.y_fused))
 
@@ -234,7 +250,7 @@ class LocalizationNode:
 if __name__ == '__main__':
 	rospy.init_node("fy03_localization_node")
 	localization_node = LocalizationNode()
-  
+
 	#rospy.on_shutdown(localization_node.clean)
 
 	try:
