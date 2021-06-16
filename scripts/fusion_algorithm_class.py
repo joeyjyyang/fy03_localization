@@ -16,7 +16,9 @@ class FusionAlgorithm:
 		self.y_K = array([[0, 0], [0, 0]])
 		self.Y = array([[0],[0]])
 		self.moving_avg_x = []
-		self.moving_avg_y = [] 
+		self.moving_avg_y = []
+		self.origin_coord = [0,0] 
+		self.i = 0
     
 	def take_avg(self, u):
 		if len(self.moving_avg_x) < 500:
@@ -52,6 +54,10 @@ class FusionAlgorithm:
 	def UWB_data(self, p_pos, pos, v, dt = 0.1):						##consider replacing dt with an actual time step from the system clock
 		#current velocity = dx/dt
 		#Assume the speed is a constant over 0.1s 
+		if not(pos == [0,0]) and self.i == 0:
+			self.X[0][0] += pos[0]
+			self.Y[0][0] += pos[1]
+			self.i += 1
 		UWB_vel_x = v[0]
 		UWB_vel_y = v[1]
 		print("IMU_vel x,y: " + str(self.X[1][0]) + ", " + str(self.Y[1][0]) + " UWB_vel x,y: " + str(UWB_vel_x) + ", " + str(UWB_vel_y) + "\n")
