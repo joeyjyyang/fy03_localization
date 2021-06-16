@@ -13,8 +13,8 @@ import scipy.stats
 # sudo apt-get install python-sklearn
 from sklearn.cluster import DBSCAN
 import threading
-# from fusion_algorithm_class import *
-from old_fusion_algorithm_class import *
+from fusion_algorithm_class import *
+# from old_fusion_algorithm_class import *
 
 class LocalizationNode:
    	def __init__(self):
@@ -23,7 +23,6 @@ class LocalizationNode:
 		self.x_tag_prev = 0
 		self.y_tag_prev = 0
 		self.fusion = FusionAlgorithm()
-		# self.fusion = FusionAlgorithm_old()
         # ROS
 		self.imu_sub = rospy.Subscriber("/imu/data", Imu, self.imuCallback, queue_size = 1)
 		self.uwb_tag_sub = rospy.Subscriber("/tag", Marker, self.tagCallback, queue_size = 1)
@@ -46,8 +45,8 @@ class LocalizationNode:
 		self.odom_base_link_tf.transform.rotation.w = imu_msg.orientation.w
     	
 		# Send acceleration data to particle filter
-		linear_acceleration_x = imu_msg.linear_acceleration.x
-		linear_acceleration_y = imu_msg.linear_acceleration.y
+		linear_acceleration_x = imu_msg.linear_acceleration.x if abs(imu_msg.linear_acceleration.x) > 0.03 else 0
+		linear_acceleration_y = imu_msg.linear_acceleration.y if abs(imu_msg.linear_acceleration.y) > 0.03 else 0
 		u = [linear_acceleration_x, linear_acceleration_y]
 
 		self.fusion.take_avg(u)
